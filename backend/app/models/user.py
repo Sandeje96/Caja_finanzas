@@ -58,7 +58,6 @@ class User(BaseModel):
         base.update({
             'phone':     self.phone,
             'name':      self.name,
-            'email':     self.email,
             'timezone':  self.timezone,
             'currency':  self.currency,
             'is_active': self.is_active,
@@ -66,8 +65,8 @@ class User(BaseModel):
         return base
 
     def to_public_dict(self) -> dict:
-        """Safe dict for API responses — no password hash."""
-        return {k: v for k, v in self.to_dict().items() if k != 'password_hash'}
+        """Safe dict for API responses."""
+        return self.to_dict()
 
     def __repr__(self) -> str:
         return f'<User phone={self.phone} name={self.name}>'
