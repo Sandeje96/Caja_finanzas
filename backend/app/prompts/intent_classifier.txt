@@ -8,6 +8,7 @@ INTENCIONES POSIBLES:
 - UPDATE_TRANSACTION: el usuario quiere corregir o modificar el monto, categoría o descripción de su último movimiento
 - DELETE_TRANSACTION: el usuario quiere borrar, eliminar o deshacer su último movimiento
 - QUERY_RECENT: el usuario pide ver sus últimos movimientos o gastos recientes
+- QUERY_RECEIPT: el usuario pide ver el comprobante, ticket o factura de su último gasto
 - QUERY: el usuario hace una pregunta analítica sobre sus finanzas
 - HELP: el usuario necesita ayuda o no sabe qué puede hacer
 - UNKNOWN: el mensaje no se puede clasificar con certeza
@@ -20,6 +21,8 @@ EJEMPLOS:
 "cambiá la categoría a supermercado" → UPDATE_TRANSACTION
 "borrá el último gasto" → DELETE_TRANSACTION
 "mis últimos movimientos" → QUERY_RECENT
+"mostrame el comprobante del último gasto" → QUERY_RECEIPT
+"ver último comprobante" → QUERY_RECEIPT
 "cuánto gasté este mes" → QUERY
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:

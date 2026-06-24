@@ -52,10 +52,58 @@ class AttachmentService:
         """
         Full pipeline: download from WhatsApp → validate → upload → link to transaction.
         Returns the created Attachment record.
-
-        TODO: Implement in Sprint 4.
         """
-        raise NotImplementedError("Sprint 4")
+        # 1. Validate MIME early
+        if mime_type not in ALLOWED_MIME_TYPES:
+            raise ValueError(f"Tipo de archivo no permitido: {mime_type}. Se aceptan: JPG, PNG, WEBP, PDF.")
+            
+        from app.services.whatsapp_service import WhatsAppService
+        whatsapp_service = WhatsAppService()
+        
+        # 2. Get download URL
+        url = whatsapp_service.get_media_download_url(whatsapp_media_id)
+        if not url:
+            raise ValueError("No se pudo obtener el link de descarga desde WhatsApp.")
+            
+        # 3. Download bytes
+        file_bytes = whatsapp_service.download_media(url)
+        if not file_bytes:
+            raise ValueError("Error al descargar el archivo desde WhatsApp.")
+            
+        # 4. Validate size & mime
+        self.validate_file(file_bytes, mime_type)
+        
+        # 5. Generate storage path & upload
+        storage_path = self.generate_storage_path(user_id, mime_type)
+        
+        from app.services.storage_service import StorageService
+        storage_service = StorageService()
+        storage_service.upload_file(file_bytes, storage_path, mime_type)
+        
+        # 6. Find recent transaction to associate
+        from app.repositories.transaction_repository import TransactionRepository
+        transaction_repo = TransactionRepository()
+        recent_tx = transaction_repo.get_recent_without_attachment(user_id, hours=24)
+        
+        # 7. Persist Attachment
+        from app.extensions import db
+        from app.models.attachment import Attachment
+        
+        attachment = Attachment(
+            user_id=user_id,
+            transaction_id=recent_tx.id if recent_tx else None,
+            storage_path=storage_path,
+            mime_type=mime_type,
+            file_size=len(file_bytes),
+            whatsapp_media_id=whatsapp_media_id,
+            status='uploaded'
+        )
+        
+        db.session.add(attachment)
+        db.session.commit()
+        
+        logger.info(f"[AttachmentService] Processed media {whatsapp_media_id} for user {user_id}. Linked to {recent_tx.id if recent_tx else 'None'}")
+        return attachment
 
     def validate_file(self, file_bytes: bytes, mime_type: str) -> None:
         """
@@ -77,8 +125,6 @@ class AttachmentService:
         """
         Generate a unique, organized storage path.
         Format: {user_id}/{year}/{month:02d}/{uuid}.{ext}
-
-        Example: 'abc123/2026/06/f47ac10b-58cc-4372-a567-0e02b2c3d479.jpg'
         """
         ext  = MIME_TO_EXT.get(mime_type, 'bin')
         now  = datetime.utcnow()
@@ -88,11 +134,10 @@ class AttachmentService:
     def get_signed_url(self, storage_path: str, expires_in: int = 3600) -> str:
         """
         Generate a temporary signed URL for a private bucket file.
-        Default expiry: 1 hour.
-
-        TODO: Implement using StorageService in Sprint 4.
         """
-        raise NotImplementedError("Sprint 4")
+        from app.services.storage_service import StorageService
+        storage_service = StorageService()
+        return storage_service.generate_signed_url(storage_path, expires_in=expires_in)
 
     def associate_to_transaction(
         self,
@@ -102,9 +147,20 @@ class AttachmentService:
     ) -> bool:
         """
         Link an orphaned attachment to a specific transaction.
-        Validates that both belong to the same user.
-        Returns True if linked successfully.
-
-        TODO: Implement in Sprint 4.
         """
-        raise NotImplementedError("Sprint 4")
+        from app.models.attachment import Attachment
+        from app.extensions import db
+        from app.repositories.transaction_repository import TransactionRepository
+        
+        attachment = Attachment.query.get(attachment_id)
+        if not attachment or str(attachment.user_id) != str(user_id):
+            return False
+            
+        transaction_repo = TransactionRepository()
+        t = transaction_repo.get_by_id(transaction_id)
+        if not t or str(t.user_id) != str(user_id):
+            return False
+            
+        attachment.transaction_id = t.id
+        db.session.commit()
+        return True

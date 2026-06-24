@@ -8,14 +8,22 @@ Access to files is only via signed URLs with short expiration.
 TODO: Implement in Sprint 4.
 """
 import logging
-import uuid
-from datetime import datetime
+from flask import current_app
 
 logger = logging.getLogger(__name__)
 
 
 class StorageService:
     """Abstraction over Supabase Storage (S3-compatible)."""
+
+    def _get_client(self):
+        from supabase import create_client
+        url = current_app.config.get('SUPABASE_URL', '')
+        key = current_app.config.get('SUPABASE_KEY', '')
+        if not url or not key:
+            logger.warning("[StorageService] SUPABASE_URL or SUPABASE_KEY not configured")
+            raise ValueError("Configuración de Supabase faltante")
+        return create_client(url, key)
 
     def upload_file(
         self,
@@ -26,19 +34,19 @@ class StorageService:
     ) -> dict:
         """
         Upload a file to Supabase Storage.
-
-        Args:
-            file_bytes: Raw file content
-            storage_path: Destination path within bucket
-            mime_type: Content-Type of the file
-            bucket: Bucket name (defaults to SUPABASE_BUCKET_RECEIPTS from config)
-
-        Returns:
-            {'storage_path': str, 'public_url': None}  # private bucket → no public URL
-
-        TODO: Implement in Sprint 4 using supabase-py client.
         """
-        raise NotImplementedError("Sprint 4")
+        bucket = bucket or current_app.config.get('SUPABASE_BUCKET_RECEIPTS', 'receipts')
+        client = self._get_client()
+        
+        # supabase-py upload
+        client.storage.from_(bucket).upload(
+            file=file_bytes,
+            path=storage_path,
+            file_options={"content-type": mime_type}
+        )
+        
+        logger.info(f"[StorageService] Uploaded {storage_path} to bucket {bucket}")
+        return {'storage_path': storage_path, 'public_url': None}
 
     def generate_signed_url(
         self,
@@ -48,24 +56,20 @@ class StorageService:
     ) -> str:
         """
         Generate a temporary signed URL for dashboard file preview/download.
-
-        Args:
-            storage_path: Path within the bucket
-            bucket: Bucket name
-            expires_in: URL lifetime in seconds (default: 1 hour)
-
-        Returns:
-            Signed URL string
-
-        TODO: Implement in Sprint 4.
         """
-        raise NotImplementedError("Sprint 4")
+        bucket = bucket or current_app.config.get('SUPABASE_BUCKET_RECEIPTS', 'receipts')
+        client = self._get_client()
+        
+        response = client.storage.from_(bucket).create_signed_url(storage_path, expires_in)
+        # response is usually a dictionary containing 'signedURL'
+        return response.get('signedURL', '') if isinstance(response, dict) else response
 
     def delete_file(self, storage_path: str, bucket: str = None) -> bool:
         """
         Delete a file from storage.
-        Returns True if deleted, False if not found or error.
-
-        TODO: Implement in Sprint 4.
         """
-        raise NotImplementedError("Sprint 4")
+        bucket = bucket or current_app.config.get('SUPABASE_BUCKET_RECEIPTS', 'receipts')
+        client = self._get_client()
+        
+        response = client.storage.from_(bucket).remove([storage_path])
+        return len(response) > 0

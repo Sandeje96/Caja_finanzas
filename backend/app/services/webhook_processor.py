@@ -183,10 +183,63 @@ class WebhookProcessor:
                         reply_text = "No encontré ningún movimiento reciente para eliminar."
                 elif intent == 'QUERY_RECENT':
                     reply_text = transaction_service.get_recent_transactions_text(user.id, limit=5)
+                elif intent == 'QUERY_RECEIPT':
+                    last_t = transaction_service.get_last_transaction(user.id)
+                    if not last_t:
+                        reply_text = "No tenés movimientos recientes."
+                    else:
+                        from app.models.attachment import Attachment
+                        att = Attachment.query.filter_by(transaction_id=last_t.id).filter(Attachment.deleted_at.is_(None)).first()
+                        if att:
+                            from app.services.attachment_service import AttachmentService
+                            url = AttachmentService().get_signed_url(att.storage_path)
+                            reply_text = f"📎 Enlace temporal generado correctamente:\n\n{url}"
+                        else:
+                            reply_text = "El último movimiento no tiene ningún comprobante asociado."
                 else:
                     reply_text = f"No entendí bien tu solicitud (Intent detectado: {intent}). Solo registro gastos e ingresos por ahora."
+        
+        elif msg_type in ('image', 'document'):
+            media_id = None
+            mime_type = None
+            
+            # The Meta webhook payload contains an array of messages.
+            # Extract the actual media_id and mime_type from the raw payload
+            messages_array = raw_payload.get('entry', [{}])[0].get('changes', [{}])[0].get('value', {}).get('messages', [])
+            if messages_array:
+                msg_obj = messages_array[0]
+                if msg_type == 'image':
+                    media_id = msg_obj.get('image', {}).get('id')
+                    mime_type = msg_obj.get('image', {}).get('mime_type')
+                elif msg_type == 'document':
+                    media_id = msg_obj.get('document', {}).get('id')
+                    mime_type = msg_obj.get('document', {}).get('mime_type')
+            
+            if not media_id or not mime_type:
+                reply_text = "❌ No se pudo identificar el archivo adjunto."
+            else:
+                from app.services.attachment_service import AttachmentService
+                attachment_service = AttachmentService()
+                
+                try:
+                    attachment = attachment_service.process_incoming_media(
+                        user_id=str(user.id),
+                        whatsapp_media_id=media_id,
+                        mime_type=mime_type
+                    )
+                    
+                    if attachment.transaction_id:
+                        reply_text = "✅ Comprobante asociado correctamente."
+                    else:
+                        reply_text = "📎 Comprobante guardado.\n\nNo encontré un gasto reciente para asociarlo.\nMás adelante podrás vincularlo manualmente."
+                except ValueError as ve:
+                    reply_text = f"❌ Error: {str(ve)}"
+                except Exception as e:
+                    logger.error(f"[WebhookProcessor] Error processing media: {e}", exc_info=True)
+                    reply_text = "❌ Ocurrió un error inesperado al procesar el archivo."
+        
         else:
-            reply_text = "Por ahora solo puedo procesar mensajes de texto. Los comprobantes se agregarán luego."
+            reply_text = "Por ahora solo puedo procesar mensajes de texto, imágenes y PDFs."
 
         # 9. Persist assistant response message
         _conversation_service.save_assistant_message(conversation.id, reply_text)
