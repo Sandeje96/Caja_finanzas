@@ -75,6 +75,8 @@ class WhatsAppService:
             f"Token:\n{token_status}\n\n"
             f"Payload:\n{payload}\n"
         )
+        
+        logger.info(f"TO enviado:\n{to_phone}")
 
         for attempt in range(MAX_RETRIES + 1):
             try:
