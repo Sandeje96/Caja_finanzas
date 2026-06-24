@@ -3,28 +3,20 @@ services/webhook_processor.py — Main orchestrator for WhatsApp webhook events.
 
 This service is the brain of the application. It coordinates all other services
 to process an incoming WhatsApp message end-to-end.
-
-Processing pipeline (Sprint 2+):
-  1. Extract message data from WhatsApp payload
-  2. Deduplicate by whatsapp_message_id
-  3. Find or create user by phone number
-  4. Get or create active conversation
-  5. Persist incoming message
-  6. Build AI context window (last N messages)
-  7. Detect intent + extract entities via AIService
-  8. Execute business logic based on intent
-  9. Persist assistant response message
-  10. Send reply via WhatsAppService
-
-Async strategy (MVP):
-  The webhook endpoint calls process_async(), which launches a daemon thread.
-  This returns HTTP 200 immediately, satisfying WhatsApp's <5s requirement.
-  For scaling beyond MVP, replace threading with Celery + Redis.
 """
 import logging
 import threading
 
+from app.repositories.user_repository import UserRepository
+from app.services.conversation_service import ConversationService
+from app.services.whatsapp_service import WhatsAppService
+from app.utils.helpers import normalize_phone
+
 logger = logging.getLogger(__name__)
+
+_user_repo = UserRepository()
+_conversation_service = ConversationService()
+_whatsapp_service = WhatsAppService()
 
 
 class WebhookProcessor:
@@ -49,7 +41,6 @@ class WebhookProcessor:
 
     def _process_with_context(self, payload: dict) -> None:
         """Wraps _process inside a Flask app context for DB access in threads."""
-        # Import here to avoid circular imports at module load
         from app import create_app
         import os
 
@@ -61,39 +52,91 @@ class WebhookProcessor:
     def _process(self, payload: dict) -> None:
         """
         Main pipeline. Runs inside a Flask app context.
-
-        TODO: Implement in Sprint 2.
         """
-        # TODO: Sprint 2 — implement full pipeline
-        logger.info(f"[WebhookProcessor] Processing payload (not yet implemented): {payload}")
+        # 1. Extract message data
+        message_data = self._extract_message_data(payload)
+        if not message_data:
+            return
+
+        phone = message_data['phone']
+        whatsapp_message_id = message_data['message_id']
+        msg_type = message_data['type']
+        content = message_data['content']
+        raw_payload = message_data['raw_payload']
+
+        # 2. Deduplicate
+        if _conversation_service.is_duplicate_message(whatsapp_message_id):
+            logger.info(f"[WebhookProcessor] Duplicate message ignored: {whatsapp_message_id}")
+            return
+
+        # 3. Find or create user
+        normalized_phone = normalize_phone(phone)
+        user, created = _user_repo.find_or_create_by_phone(normalized_phone)
+        if created:
+            _user_repo.save()
+            logger.info(f"[WebhookProcessor] Created new user: {normalized_phone}")
+
+        # 4. Get or create active conversation
+        conversation = _conversation_service.get_or_create_active_conversation(user.id)
+
+        # 5. Persist incoming message
+        _conversation_service.save_user_message(
+            conversation_id=conversation.id,
+            content=content if content else f"[{msg_type} message]",
+            message_type=msg_type,
+            whatsapp_message_id=whatsapp_message_id,
+            raw_payload=raw_payload
+        )
+
+        logger.info(f"[WebhookProcessor] Received {msg_type} from {normalized_phone}: {content}")
+
+        # MVP Sprint 2 output
+        # For now, just send a simple acknowledgment
+        reply_text = f"Mensaje recibido y guardado. Contenido: {content}"
+        
+        # 9. Persist assistant response message
+        _conversation_service.save_assistant_message(conversation.id, reply_text)
+        
+        # 10. Send reply via WhatsAppService
+        _whatsapp_service.send_text_message(normalized_phone, reply_text)
+
 
     def _extract_message_data(self, payload: dict) -> dict | None:
         """
         Extract relevant fields from a WhatsApp webhook payload.
-
-        Expected payload structure:
-        {
-          "object": "whatsapp_business_account",
-          "entry": [{
-            "changes": [{
-              "value": {
-                "messages": [{
-                  "id": "wamid.xxx",
-                  "from": "5491112345678",
-                  "type": "text",
-                  "text": {"body": "gasté 18000 en supermercado"}
-                }]
-              }
-            }]
-          }]
-        }
-
-        Returns dict with: phone, message_id, type, content, raw_payload
-        Returns None if no processable message is found.
-
-        TODO: Implement in Sprint 2.
         """
-        raise NotImplementedError("Sprint 2")
+        try:
+            entry = payload.get('entry', [])[0]
+            changes = entry.get('changes', [])[0]
+            value = changes.get('value', {})
+            messages = value.get('messages', [])
+            
+            if not messages:
+                return None
+                
+            msg = messages[0]
+            phone = msg.get('from')
+            msg_id = msg.get('id')
+            msg_type = msg.get('type')
+            
+            content = None
+            if msg_type == 'text':
+                content = msg.get('text', {}).get('body')
+            elif msg_type == 'image':
+                content = msg.get('image', {}).get('caption')
+            elif msg_type == 'document':
+                content = msg.get('document', {}).get('caption') or msg.get('document', {}).get('filename')
+                
+            return {
+                'phone': phone,
+                'message_id': msg_id,
+                'type': msg_type,
+                'content': content,
+                'raw_payload': payload
+            }
+        except Exception as e:
+            logger.warning(f"[WebhookProcessor] Failed to extract message data: {e}")
+            return None
 
     def _handle_text_message(
         self,
@@ -102,12 +145,6 @@ class WebhookProcessor:
         message_text: str,
         message_db_id: str,
     ) -> str:
-        """
-        Process a plain text message through the full AI pipeline.
-        Returns the response text to send back to the user.
-
-        TODO: Implement in Sprint 3 (depends on AIService).
-        """
         raise NotImplementedError("Sprint 3")
 
     def _handle_media_message(
@@ -116,10 +153,4 @@ class WebhookProcessor:
         conversation,
         media_data: dict,
     ) -> str:
-        """
-        Process an image/document message as a receipt.
-        Returns the response text to send back to the user.
-
-        TODO: Implement in Sprint 4 (depends on AttachmentService).
-        """
         raise NotImplementedError("Sprint 4")

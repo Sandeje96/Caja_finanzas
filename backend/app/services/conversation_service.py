@@ -6,14 +6,14 @@ Responsible for:
 - Persisting incoming (user) and outgoing (assistant) messages
 - Building the AI context window from message history
 - Deduplication check delegation
-
-TODO: Implement in Sprint 2.
 """
 import logging
 
 from app.extensions import db
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
+from app.models.conversation import Conversation
+from app.models.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -24,14 +24,22 @@ _message_repo = MessageRepository()
 class ConversationService:
     """Manages the conversational state for each user."""
 
-    def get_or_create_active_conversation(self, user_id: str):
+    def get_or_create_active_conversation(self, user_id: str) -> Conversation:
         """
         Return the current active conversation for a user.
         If none exists, create a new one.
-
-        TODO: Implement in Sprint 2.
         """
-        raise NotImplementedError("Sprint 2")
+        conversation = _conversation_repo.get_active_for_user(user_id)
+        if conversation:
+            return conversation
+        
+        # Deactivate any previous active ones just in case
+        _conversation_repo.deactivate_all_for_user(user_id)
+        
+        conversation = _conversation_repo.create(user_id=user_id, is_active=True)
+        _conversation_repo.save()
+        logger.info(f"[ConversationService] Created new active conversation for user {user_id}")
+        return conversation
 
     def save_user_message(
         self,
@@ -40,23 +48,36 @@ class ConversationService:
         message_type: str = 'text',
         whatsapp_message_id: str = None,
         raw_payload: dict = None,
-    ):
+    ) -> Message:
         """
         Persist an incoming message from the WhatsApp user.
         Returns the created Message instance.
-
-        TODO: Implement in Sprint 2.
         """
-        raise NotImplementedError("Sprint 2")
+        message = _message_repo.create(
+            conversation_id=conversation_id,
+            role='user',
+            content=content or '',
+            message_type=message_type,
+            whatsapp_message_id=whatsapp_message_id,
+            raw_payload=raw_payload
+        )
+        _message_repo.save()
+        logger.debug(f"[ConversationService] Saved user message {whatsapp_message_id}")
+        return message
 
-    def save_assistant_message(self, conversation_id: str, content: str):
+    def save_assistant_message(self, conversation_id: str, content: str) -> Message:
         """
         Persist the AI assistant's response.
         Returns the created Message instance.
-
-        TODO: Implement in Sprint 2.
         """
-        raise NotImplementedError("Sprint 2")
+        message = _message_repo.create(
+            conversation_id=conversation_id,
+            role='assistant',
+            content=content,
+            message_type='text'
+        )
+        _message_repo.save()
+        return message
 
     def build_ai_context(
         self,
@@ -66,18 +87,15 @@ class ConversationService:
         """
         Build the messages array for the OpenAI API.
         Returns a list of {'role': ..., 'content': ...} dicts in chronological order.
-
-        The limit is controlled by OPENAI_MAX_CONTEXT_MESSAGES in config.
-
-        TODO: Implement in Sprint 3.
         """
-        raise NotImplementedError("Sprint 3")
+        messages = _message_repo.get_context_window(conversation_id, limit=limit)
+        return [m.to_ai_context_dict() for m in messages]
 
     def is_duplicate_message(self, whatsapp_message_id: str) -> bool:
         """
         Check if a WhatsApp message has already been processed.
         Returns True if duplicate (should be discarded silently).
-
-        TODO: Implement in Sprint 2.
         """
-        raise NotImplementedError("Sprint 2")
+        if not whatsapp_message_id:
+            return False
+        return _message_repo.is_duplicate(whatsapp_message_id)
