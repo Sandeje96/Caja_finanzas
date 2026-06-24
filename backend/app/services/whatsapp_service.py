@@ -64,25 +64,41 @@ class WhatsAppService:
             'text':              {'body': message},
         }
 
+        phone_id = current_app.config.get('WHATSAPP_PHONE_NUMBER_ID', '')
+        url = f"{self._base_url()}/messages"
+        
+        logger.info(
+            f"[WhatsApp] Preparando envío.\n"
+            f"URL: {url}\n"
+            f"Phone Number ID: {phone_id}\n"
+            f"Destino: {to_phone}\n"
+            f"Payload: {payload}"
+        )
+
         for attempt in range(MAX_RETRIES + 1):
             try:
                 response = requests.post(
-                    f"{self._base_url()}/messages",
+                    url,
                     json=payload,
                     headers=self._headers(),
                     timeout=10,
                 )
+                
+                if not response.ok:
+                    logger.error(
+                        f"[WhatsApp] Error de Meta (Intento {attempt + 1}).\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {response.text}"
+                    )
+                
                 response.raise_for_status()
                 logger.info(f"[WhatsApp] Message sent to {to_phone} (attempt {attempt + 1})")
                 return True
 
             except requests.HTTPError as exc:
-                logger.warning(
-                    f"[WhatsApp] HTTP error on attempt {attempt + 1}: "
-                    f"{exc.response.status_code} {exc.response.text[:200]}"
-                )
+                logger.exception(f"[WhatsApp] HTTP error traceback on attempt {attempt + 1}")
             except requests.RequestException as exc:
-                logger.warning(f"[WhatsApp] Network error on attempt {attempt + 1}: {exc}")
+                logger.exception(f"[WhatsApp] Network error traceback on attempt {attempt + 1}")
 
             if attempt < MAX_RETRIES:
                 backoff = INITIAL_BACKOFF_SECONDS * (2 ** attempt)
