@@ -10,8 +10,8 @@ INTENCIONES POSIBLES:
 - UNKNOWN: el mensaje no se puede clasificar con certeza
 
 EJEMPLOS:
-"gasté 18000 en supermercado" → REGISTER_EXPENSE
-"cobré 850000 de sueldo" → REGISTER_INCOME
+"gasté 15 lucas en combustible" → REGISTER_EXPENSE
+"cobré 850 mil de sueldo" → REGISTER_INCOME
 "te mando el ticket" → ATTACH_RECEIPT
 "cuánto gasté este mes" → QUERY
 "en realidad eran 20000, no 18000" → UPDATE_TRANSACTION
@@ -22,17 +22,18 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "intent": "REGISTER_EXPENSE",
   "confidence": 0.97,
   "entities": {
-    "amount": 18000,
-    "category": "Supermercado",
-    "description": "supermercado",
+    "amount": 15000,
+    "category": "Combustible",
+    "description": "combustible",
     "date": null
   }
 }
 
 REGLAS:
 - "confidence" debe ser un número entre 0 y 1
-- "amount" debe ser un número positivo sin signo, o null si no se menciona
+- Para extraer las "entities", respeta que "amount" sea numérico convertido (ej. 15 lucas = 15000, 850 mil = 850000, 2 palos = 2000000, medio palo = 500000).
 - "category" debe ser el nombre de categoría más probable, o null
 - "date" debe ser una fecha ISO 8601 si se menciona, o null para hoy
 - Si la intención es QUERY, UPDATE_TRANSACTION, HELP o UNKNOWN, "entities" puede ser {}
-- Responde SOLO con el JSON, sin texto adicional
+- Responde SOLO con el JSON validado (sin bloques de código markdown ni texto adicional).
+- FECHA DE HOY: {today}

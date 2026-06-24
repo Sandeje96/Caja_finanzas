@@ -6,15 +6,21 @@ ENTIDADES A EXTRAER:
 - description: descripción breve del movimiento
 - date: fecha mencionada en formato ISO 8601 (YYYY-MM-DD), null si no se menciona
 
+EXPRESIONES ARGENTINAS (conversión a número):
+- "luca" o "lucas" = 1000 (ej: 15 lucas = 15000)
+- "mil" = 1000 (ej: 15 mil = 15000)
+- "palo" o "palos" o "millón" = 1000000 (ej: 2 palos = 2000000)
+- "medio palo" = 500000
+
 CATEGORÍAS DEL SISTEMA:
 Gastos: Supermercado, Combustible, Servicios, Internet, Telefonía, Alquiler, Expensas, Salud, Farmacia, Restaurante, Educación, Impuestos, Transporte, Entretenimiento, Mascotas, Indumentaria, Otros
 Ingresos: Sueldo, Freelance, Alquiler Cobrado, Inversiones, Otros
 
 EJEMPLOS:
-"gasté 18000 en supermercado" → {"amount": 18000, "category": "Supermercado", "description": "supermercado", "date": null}
+"gasté 15 lucas en combustible" → {"amount": 15000, "category": "Combustible", "description": "combustible", "date": null}
 "combustible 25000 ayer" → {"amount": 25000, "category": "Combustible", "description": "combustible", "date": "AYER_ISO"}
 "pagué la factura de luz 12500" → {"amount": 12500, "category": "Servicios", "description": "factura de luz", "date": null}
-"cobré el sueldo 950000" → {"amount": 950000, "category": "Sueldo", "description": "sueldo", "date": null}
+"cobré el sueldo 850 mil" → {"amount": 850000, "category": "Sueldo", "description": "sueldo", "date": null}
 
 FECHA DE HOY: {today}
 
