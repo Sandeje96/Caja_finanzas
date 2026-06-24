@@ -180,3 +180,85 @@ class TransactionRepository(BaseRepository):
             .limit(limit)
             .all()
         )
+
+    def get_biggest_expense(self, user_id: str, year: int, month: int) -> Transaction | None:
+        """Get the single largest expense transaction for a given month."""
+        return (
+            Transaction.query
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == 'expense',
+                Transaction.deleted_at.is_(None),
+                func.extract('year',  Transaction.transaction_date) == year,
+                func.extract('month', Transaction.transaction_date) == month,
+            )
+            .order_by(Transaction.amount.desc())
+            .first()
+        )
+
+    def get_category_expense_total(self, user_id: str, category_name: str, year: int, month: int) -> float:
+        """Get total expense for a specific category string in a given month."""
+        # Using ILIKE to match category name
+        row = (
+            Transaction.query
+            .with_entities(func.sum(Transaction.amount).label('total'))
+            .join(Category, Transaction.category_id == Category.id)
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == 'expense',
+                Transaction.deleted_at.is_(None),
+                Category.name.ilike(f'%{category_name}%'),
+                func.extract('year',  Transaction.transaction_date) == year,
+                func.extract('month', Transaction.transaction_date) == month,
+            )
+            .first()
+        )
+        return float(row.total or 0) if row else 0.0
+
+    def get_transactions_by_date(self, user_id: str, specific_date: date) -> list[Transaction]:
+        """Get all transactions for a specific date."""
+        return (
+            Transaction.query
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.deleted_at.is_(None),
+                Transaction.transaction_date == specific_date,
+            )
+            .order_by(Transaction.created_at.desc())
+            .all()
+        )
+
+    def search_receipts_by_merchant(self, user_id: str, merchant_name: str) -> list[Attachment]:
+        """
+        Hybrid search for receipts by merchant name.
+        Search logic:
+        1. Exact/ILIKE match on transactions.merchant
+        2. ILIKE match on transactions.description
+        3. Match inside attachments.ocr_json->>'merchant'
+        Returns matching Attachment objects.
+        """
+        from sqlalchemy import or_
+        from app.models.attachment import Attachment
+        
+        search_term = f'%{merchant_name}%'
+        
+        # Build JSON extraction depending on dialect (Postgres vs SQLite)
+        # SQLAlchemy supports JSON functions but for simple cross-DB testing we use raw conditions or just ILIKE cast
+        # We'll use CAST to String and ILIKE to be completely dialect-agnostic
+        from sqlalchemy import cast, String
+        
+        return (
+            Attachment.query
+            .join(Transaction, Attachment.transaction_id == Transaction.id, isouter=True)
+            .filter(
+                Attachment.user_id == user_id,
+                Attachment.deleted_at.is_(None),
+                or_(
+                    Transaction.merchant.ilike(search_term),
+                    Transaction.description.ilike(search_term),
+                    cast(Attachment.ocr_json, String).ilike(search_term)
+                )
+            )
+            .order_by(Attachment.created_at.desc())
+            .all()
+        )

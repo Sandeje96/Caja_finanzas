@@ -11,8 +11,8 @@ Key design:
   - whatsapp_media_id links back to the WhatsApp media object (for debugging)
   - Access is via signed URLs with expiration (never public permanent URLs)
 """
-from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.extensions import db
 from app.models.base import BaseModel
@@ -39,8 +39,17 @@ class Attachment(BaseModel):
     file_size  = Column(Integer,     nullable=True)   # bytes
 
     # ─── Status ───────────────────────────────────────────────────────────────
-    # pending → uploading → uploaded | failed | processing (OCR, future)
+    # pending → uploading → uploaded | failed
     status = Column(String(20), default='uploaded', nullable=False)
+
+    # ─── OCR Data ─────────────────────────────────────────────────────────────
+    from sqlalchemy.dialects.postgresql import JSONB
+    from sqlalchemy import JSON
+    ocr_json         = Column(JSON().with_variant(JSONB, 'postgresql'), nullable=True)
+    ocr_confidence   = Column(db.Float, nullable=True)
+    ocr_processed_at = Column(db.DateTime(timezone=True), nullable=True)
+    # pending, processed, failed
+    ocr_status       = Column(String(20), nullable=True)
 
     # WhatsApp's own media ID — used to re-download if needed
     whatsapp_media_id = Column(String(100), nullable=True)

@@ -95,15 +95,26 @@ class WebhookProcessor:
             text_lower = content.strip().lower()
             
             from app.services.transaction_service import TransactionService
+            from app.services.pending_action_service import PendingActionService
             transaction_service = TransactionService()
+            pending_action_service = PendingActionService()
 
             # Fast-path for simple confirmations without using AI
             if text_lower in ('ok', 'si', 'sí', 'dale', 'confirmar'):
-                t = transaction_service.confirm_last_transaction(user.id)
-                if t:
-                    reply_text = f"✅ Movimiento confirmado (${float(t.amount):,.0f})".replace(',', '.')
+                result = pending_action_service.resolve_last_action(str(user.id))
+                if result:
+                    reply_text = f"✅ Acción confirmada y ejecutada correctamente."
+                    t = result.get('transaction')
+                    if t:
+                        cat_name = t.category.name if t.category else 'Otros'
+                        reply_text += f"\n\nMonto: ${float(t.amount):,.0f}\nCategoría: {cat_name}".replace(',', '.')
                 else:
-                    reply_text = "No tenés ningún movimiento reciente pendiente de confirmación."
+                    reply_text = "No tenés ninguna acción pendiente de confirmación."
+            elif text_lower in ('no', 'cancelar', 'olvidalo'):
+                if pending_action_service.cancel_last_action(str(user.id)):
+                    reply_text = "🚫 Acción cancelada. No se registró ningún cambio."
+                else:
+                    reply_text = "No tenés ninguna acción pendiente para cancelar."
             else:
                 context = _conversation_service.build_ai_context(conversation.id)
                 
@@ -130,57 +141,78 @@ class WebhookProcessor:
                         category_name = entities.get('category')
                         desc = entities.get('description', '')
                         
-                        if intent == 'REGISTER_EXPENSE':
-                            t = transaction_service.create_expense(
-                                user_id=user.id,
-                                amount=amount,
-                                description=desc,
-                                category_name=category_name,
-                                message_id=user_msg.id,
-                                ai_confidence=confidence
-                            )
-                            verb = "Gasto registrado"
-                        else:
-                            t = transaction_service.create_income(
-                                user_id=user.id,
-                                amount=amount,
-                                description=desc,
-                                category_name=category_name,
-                                message_id=user_msg.id,
-                                ai_confidence=confidence
-                            )
-                            verb = "Ingreso registrado"
-                            
-                        formatted_date = t.transaction_date.strftime('%d/%m/%Y')
-                        cat_name = t.category.name if t.category else 'Otros'
-                        formatted_amount = f"{float(t.amount):,.0f}".replace(',', '.')
-                        
-                        if t.is_confirmed:
+                        if confidence >= 0.85:
+                            if intent == 'REGISTER_EXPENSE':
+                                t = transaction_service.create_expense(
+                                    user_id=user.id,
+                                    amount=amount,
+                                    description=desc,
+                                    category_name=category_name,
+                                    message_id=user_msg.id,
+                                    ai_confidence=confidence
+                                )
+                                verb = "Gasto registrado"
+                            else:
+                                t = transaction_service.create_income(
+                                    user_id=user.id,
+                                    amount=amount,
+                                    description=desc,
+                                    category_name=category_name,
+                                    message_id=user_msg.id,
+                                    ai_confidence=confidence
+                                )
+                                verb = "Ingreso registrado"
+                                
+                            formatted_date = t.transaction_date.strftime('%d/%m/%Y')
+                            cat_name = t.category.name if t.category else 'Otros'
+                            formatted_amount = f"{float(t.amount):,.0f}".replace(',', '.')
                             reply_text = f"✅ {verb}\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}"
                         else:
-                            reply_text = f"⚠️ Por favor confirmá este {verb.lower()}:\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}\n\nRespondé OK para confirmar."
+                            # Low confidence -> Create pending action
+                            action_type = 'CONFIRM_EXPENSE' if intent == 'REGISTER_EXPENSE' else 'CONFIRM_INCOME'
+                            verb = "gasto" if intent == 'REGISTER_EXPENSE' else "ingreso"
+                            pending_action_service.create_action(
+                                user_id=str(user.id),
+                                action_type=action_type,
+                                payload={
+                                    'amount': amount,
+                                    'description': desc,
+                                    'category': category_name,
+                                    'message_id': str(user_msg.id),
+                                    'confidence': confidence
+                                }
+                            )
+                            formatted_amount = f"{float(amount):,.0f}".replace(',', '.')
+                            reply_text = f"⚠️ Por favor confirmá este {verb}:\n\nMonto: ${formatted_amount}\nCategoría: {category_name or 'Otros'}\n\nRespondé OK para confirmar o NO para cancelar."
                 elif intent == 'CONFIRM_TRANSACTION':
-                    t = transaction_service.confirm_last_transaction(user.id)
-                    if t:
-                        reply_text = f"✅ Movimiento confirmado (${float(t.amount):,.0f})".replace(',', '.')
+                    result = pending_action_service.resolve_last_action(str(user.id))
+                    if result:
+                        reply_text = f"✅ Acción confirmada."
                     else:
-                        reply_text = "No encontré ningún movimiento reciente para confirmar."
+                        reply_text = "No encontré ninguna acción pendiente para confirmar."
+                elif intent == 'CANCEL_TRANSACTION':
+                    if pending_action_service.cancel_last_action(str(user.id)):
+                        reply_text = "🚫 Acción cancelada."
+                    else:
+                        reply_text = "No encontré ninguna acción pendiente para cancelar."
                 elif intent == 'UPDATE_TRANSACTION':
-                    amount = entities.get('amount')
-                    category_name = entities.get('category')
-                    desc = entities.get('description')
-                    t = transaction_service.update_last_transaction(user.id, amount=amount, category_name=category_name, description=desc)
-                    if t:
-                        cat_name = t.category.name if t.category else 'Otros'
-                        reply_text = f"✅ Movimiento actualizado y confirmado.\n\nMonto: ${float(t.amount):,.0f}\nCategoría: {cat_name}".replace(',', '.')
-                    else:
-                        reply_text = "No encontré ningún movimiento reciente para actualizar."
+                    pending_action_service.create_action(
+                        user_id=str(user.id),
+                        action_type='UPDATE_TRANSACTION',
+                        payload={
+                            'amount': entities.get('amount'),
+                            'category': entities.get('category'),
+                            'description': entities.get('description')
+                        }
+                    )
+                    reply_text = "¿Querés aplicar esta corrección al último movimiento?\nRespondé OK para confirmar."
                 elif intent == 'DELETE_TRANSACTION':
-                    t = transaction_service.delete_last_transaction(user.id)
-                    if t:
-                        reply_text = f"🗑️ Movimiento eliminado (${float(t.amount):,.0f})".replace(',', '.')
-                    else:
-                        reply_text = "No encontré ningún movimiento reciente para eliminar."
+                    pending_action_service.create_action(
+                        user_id=str(user.id),
+                        action_type='DELETE_TRANSACTION',
+                        payload={}
+                    )
+                    reply_text = "⚠️ ¿Estás seguro que querés eliminar el último movimiento?\nRespondé OK para confirmar."
                 elif intent == 'QUERY_RECENT':
                     reply_text = transaction_service.get_recent_transactions_text(user.id, limit=5)
                 elif intent == 'QUERY_RECEIPT':
@@ -196,6 +228,16 @@ class WebhookProcessor:
                             reply_text = f"📎 Enlace temporal generado correctamente:\n\n{url}"
                         else:
                             reply_text = "El último movimiento no tiene ningún comprobante asociado."
+                elif intent == 'QUERY_RECEIPT_SEARCH':
+                    from app.services.receipt_search_service import ReceiptSearchService
+                    reply_text = ReceiptSearchService().search_receipts(str(user.id), entities.get('merchant'))
+                elif intent in (
+                    'QUERY_MONTH_EXPENSES', 'QUERY_MONTH_INCOME', 'QUERY_BALANCE',
+                    'QUERY_CATEGORY_EXPENSES', 'QUERY_TOP_CATEGORY', 'QUERY_BIGGEST_EXPENSE',
+                    'QUERY_COMPARE_MONTHS', 'QUERY_DATE_EXPENSES'
+                ):
+                    from app.services.financial_analytics_service import FinancialAnalyticsService
+                    reply_text = FinancialAnalyticsService().handle_query(str(user.id), intent, entities)
                 else:
                     reply_text = f"No entendí bien tu solicitud (Intent detectado: {intent}). Solo registro gastos e ingresos por ahora."
         
@@ -229,9 +271,50 @@ class WebhookProcessor:
                     )
                     
                     if attachment.transaction_id:
-                        reply_text = "✅ Comprobante asociado correctamente."
+                        reply_text = "✅ Comprobante asociado al último gasto correctamente."
                     else:
-                        reply_text = "📎 Comprobante guardado.\n\nNo encontré un gasto reciente para asociarlo.\nMás adelante podrás vincularlo manualmente."
+                        # Orphan attachment -> OCR Flow
+                        from app.services.ocr_service import OCRService
+                        from app.services.pending_action_service import PendingActionService
+                        from datetime import datetime, timezone
+                        
+                        ocr_service = OCRService()
+                        url = attachment_service.get_signed_url(attachment.storage_path)
+                        ocr_data, conf = ocr_service.analyze_receipt_from_url(url, str(user.id), str(user_msg.id))
+                        
+                        # Guardar metadatos OCR en attachment
+                        attachment.ocr_json = ocr_data
+                        attachment.ocr_confidence = conf
+                        attachment.ocr_processed_at = datetime.now(timezone.utc)
+                        
+                        from app.extensions import db
+                        if not ocr_data or conf < 0.80:
+                            attachment.ocr_status = 'failed'
+                            reply_text = "No pude interpretar correctamente el comprobante.\n¿Querés registrar el gasto manualmente?"
+                        else:
+                            attachment.ocr_status = 'processed'
+                            PendingActionService().create_action(
+                                user_id=str(user.id),
+                                action_type='OCR_CREATE_TRANSACTION',
+                                payload={
+                                    'attachment_id': str(attachment.id),
+                                    'merchant': ocr_data.get('merchant'),
+                                    'amount': ocr_data.get('amount'),
+                                    'category': ocr_data.get('category'),
+                                    'date': ocr_data.get('date'),
+                                    'confidence': conf
+                                }
+                            )
+                            amount_fmt = f"{float(ocr_data.get('amount', 0)):,.0f}".replace(',', '.')
+                            reply_text = (
+                                f"Detecté:\n"
+                                f"Comercio: {ocr_data.get('merchant', 'Desconocido')}\n"
+                                f"Monto: ${amount_fmt}\n"
+                                f"Categoría: {ocr_data.get('category', 'Otros')}\n"
+                                f"Fecha: {ocr_data.get('date', '')}\n\n"
+                                f"¿Querés registrar este gasto? (Respondé Sí o No)"
+                            )
+                        db.session.commit()
                 except ValueError as ve:
                     reply_text = f"❌ Error: {str(ve)}"
                 except Exception as e:

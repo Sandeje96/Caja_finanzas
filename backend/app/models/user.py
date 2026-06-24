@@ -6,7 +6,7 @@ The email + password_hash fields are only used for dashboard authentication.
 A user can interact with the system exclusively via WhatsApp without ever
 setting an email or password.
 """
-from sqlalchemy import Boolean, Column, String
+from sqlalchemy import Boolean, Column, String, DateTime
 
 from app.extensions import db
 from app.models.base import BaseModel
@@ -22,9 +22,9 @@ class User(BaseModel):
     # Optional: display name from WhatsApp or set by user
     name = Column(String(100), nullable=True)
 
-    # Dashboard login credentials (nullable — not required for WhatsApp-only usage)
-    email = Column(String(150), unique=True, nullable=True)
-    password_hash = Column(String(255), nullable=True)
+    # Dashboard login credentials (OTP based)
+    otp_code = Column(String(6), nullable=True)
+    otp_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # ─── Preferences ──────────────────────────────────────────────────────────
     timezone = Column(String(50), default='America/Argentina/Buenos_Aires', nullable=False)

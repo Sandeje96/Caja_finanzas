@@ -54,18 +54,15 @@ def create_app(config_name: str = 'default') -> Flask:
 
 def _init_extensions(app: Flask) -> None:
     """Initialize and bind Flask extensions to the app."""
-    # CORS: allow React frontend in dev; restrict in production via env
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # CORS: restrict to FRONTEND_URL
+    frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
     # Import all models BEFORE calling migrate.init_app so Alembic
     # can detect every table during autogenerate.
-    import app.models.user          # noqa: F401
-    import app.models.conversation  # noqa: F401
-    import app.models.message       # noqa: F401
-    import app.models.category      # noqa: F401
-    import app.models.transaction   # noqa: F401
-    import app.models.attachment    # noqa: F401
-    import app.models.ai_log        # noqa: F401
+    from app.models import (
+        user, conversation, message, category, transaction, attachment, ai_log, pending_action, audit_log
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)

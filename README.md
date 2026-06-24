@@ -1,134 +1,63 @@
-# 💬 Finanzas IA WhatsApp
+# Caja Finanzas — Despliegue a Producción 🚀
 
-> Asistente financiero personal conversacional. Registrá gastos, ingresos y comprobantes simplemente hablando por WhatsApp.
+Este repositorio contiene un sistema financiero integrado por un Backend (Flask) que sirve de webhook para WhatsApp y expone una API, y un Frontend (React/Vite) que funciona como un Dashboard web para el usuario.
 
----
+## 1. Backend (Despliegue en Railway)
 
-## Stack
+El backend está preparado para funcionar en plataformas como Railway, Heroku o Render, mediante Nixpacks o Docker.
 
-| Capa | Tecnología |
-|---|---|
-| Backend | Flask 3 + SQLAlchemy + Alembic |
-| Base de datos | PostgreSQL 15 |
-| IA | OpenAI GPT-4o-mini |
-| Canal | WhatsApp Cloud API |
-| Storage | Supabase Storage (bucket privado) |
-| Frontend | React + Vite + TailwindCSS + Recharts |
-| Deploy | Railway |
+### Variables de Entorno Requeridas en Producción
 
----
+Para que el servidor en producción arranque exitosamente (`ProductionConfig`), debes configurar las siguientes variables:
 
-## Inicio Rápido (Docker)
+* `FLASK_ENV`: `production`
+* `SECRET_KEY`: Una cadena segura aleatoria (ej. generada con `openssl rand -hex 32`).
+* `JWT_SECRET_KEY`: Otra cadena segura para firmar los tokens del Dashboard.
+* `DATABASE_URL`: URL de conexión a PostgreSQL (provista por Railway, ej. `postgresql://user:pass@host:port/db`).
+* `FRONTEND_URL`: La URL pública donde se desplegará el frontend (ej. `https://mi-dashboard.vercel.app`). Sirve para configurar el **CORS**.
+* `OPENAI_API_KEY`: Tu clave de OpenAI.
+* `SUPABASE_URL`: La URL de tu proyecto en Supabase.
+* `SUPABASE_KEY`: Tu clave de API de Supabase (Service Role Key preferentemente, o Anon Key si las políticas lo permiten).
+* `SUPABASE_BUCKET_RECEIPTS`: Nombre de tu bucket (por defecto `receipts`).
+* `WHATSAPP_TOKEN`: El token permanente de la API de Cloud de WhatsApp.
+* `WHATSAPP_VERIFY_TOKEN`: El token de verificación para el webhook (tú lo defines en Meta).
+* `WHATSAPP_PHONE_NUMBER_ID`: El ID del número de teléfono en Meta.
 
+### Comandos de Despliegue
+
+Railway leerá automáticamente el archivo `Procfile` y ejecutará:
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url>
-cd finanzas-ia-whatsapp
-
-# 2. Levantar backend + base de datos
-docker compose up --build
-
-# 3. Verificar que el backend está corriendo
-curl http://localhost:5000/api/health
+flask db upgrade && flask seed-db && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 run:app
 ```
+Esto asegurará que las migraciones de base de datos se ejecuten y se cree la base de datos de ser necesario antes de iniciar el servidor de producción `gunicorn`.
 
-El primer inicio:
-1. Construye la imagen Docker del backend
-2. Espera a que PostgreSQL esté listo (healthcheck)
-3. Ejecuta las migraciones (`flask db upgrade`)
-4. Siembra las categorías iniciales (`flask seed-db`)
-5. Inicia Flask en modo desarrollo con hot-reload
+> **Nota para Docker**: Si Railway detecta y prefiere usar el `Dockerfile`, el script `entrypoint.sh` se ejecutará. El script fue modificado para usar `gunicorn` si `FLASK_ENV=production`.
 
 ---
 
-## Variables de Entorno
+## 2. Frontend (Despliegue en Vercel)
 
-Copiá el archivo de ejemplo y completá tus credenciales reales:
+El Frontend está desarrollado con React, Vite y TailwindCSS. Se recomienda desplegarlo como un proyecto independiente en Vercel o Netlify.
 
-```bash
-cp backend/.env.example backend/.env
-```
+### Variables de Entorno Requeridas
+* `VITE_API_URL`: La URL pública de tu backend en Railway apuntando a `/api` (ej. `https://mi-backend-railway.app/api`).
 
-Las variables requeridas para producción están documentadas en `backend/.env.example`.
-
-> Para desarrollo local con Docker, **no es necesario** crear `.env`.  
-> Los valores de desarrollo están en `docker-compose.yml`.
-
----
-
-## Estructura del Proyecto
-
-```
-finanzas-ia-whatsapp/
-├── backend/                    # Flask API
-│   ├── app/
-│   │   ├── api/                # Endpoints HTTP (Blueprint por módulo)
-│   │   ├── models/             # SQLAlchemy ORM models
-│   │   ├── repositories/       # Capa de acceso a datos
-│   │   ├── services/           # Lógica de negocio
-│   │   ├── prompts/            # Templates de prompts para OpenAI
-│   │   └── utils/              # Validadores, decorators, helpers
-│   ├── migrations/             # Alembic migrations
-│   └── tests/
-├── frontend/                   # React + Vite dashboard
-└── docker-compose.yml
-```
+### Configuración en Vercel
+1. Conecta el repositorio de GitHub a Vercel.
+2. Selecciona la carpeta `frontend/` como *Root Directory* (o configúralo en los comandos).
+3. **Framework Preset**: Vite.
+4. **Build Command**: `npm run build`
+5. **Output Directory**: `dist`
+6. Añade la variable `VITE_API_URL` en las *Environment Variables*.
 
 ---
 
-## Endpoints disponibles (MVP actual)
+## 3. Configuración en Meta for Developers
 
-| Método | Ruta | Estado |
-|--------|------|--------|
-| `GET` | `/api/health` | ✅ Implementado |
-| `GET` | `/api/webhook` | ✅ Verificación WhatsApp |
-| `POST` | `/api/webhook` | 🔧 Sprint 2 |
-| `POST` | `/api/auth/login` | 🔧 Sprint 6 |
-| `GET` | `/api/transactions` | 🔧 Sprint 5 |
-| `GET` | `/api/dashboard/summary` | 🔧 Sprint 5 |
+Una vez desplegado el Backend, debes ir al portal de Meta y configurar el Webhook:
+1. **Callback URL**: `https://<tu-backend-railway>.app/api/webhook`
+2. **Verify Token**: El mismo que colocaste en la variable `WHATSAPP_VERIFY_TOKEN`.
+3. Suscríbete al evento `messages`.
 
----
-
-## Comandos útiles
-
-```bash
-# Ejecutar solo la base de datos
-docker compose up db
-
-# Ver logs del backend
-docker compose logs -f backend
-
-# Correr las migraciones manualmente
-docker compose exec backend flask db upgrade
-
-# Sembrar categorías iniciales
-docker compose exec backend flask seed-db
-
-# Crear una nueva migración
-docker compose exec backend flask db migrate -m "descripcion del cambio"
-
-# Abrir psql en el contenedor
-docker compose exec db psql -U finanzas_user -d finanzas_ia
-```
-
----
-
-## Roadmap
-
-- **Sprint 1** ✅ Estructura + modelos + migraciones + /health
-- **Sprint 2** 🔧 Canal WhatsApp + deduplicación + usuarios
-- **Sprint 3** 🔧 Motor IA (OpenAI) + registro de gastos/ingresos
-- **Sprint 4** 🔧 Comprobantes (Supabase Storage)
-- **Sprint 5** 🔧 Consultas financieras
-- **Sprint 6** 🔧 Autenticación JWT del dashboard
-- **Sprint 7** 🔧 Dashboard React
-- **Sprint 8** 🔧 Testing + deploy Railway
-
----
-
-## Filosofía
-
-> El dashboard es secundario. La experiencia conversacional es el producto.
-
-Todo el diseño asume que el usuario usa WhatsApp el 90% del tiempo.  
-Ver los documentos de arquitectura: `CLAUDE.md` y `PROJECT_CONTEXT.md`.
+## ¡Todo Listo!
+Con estas configuraciones, tu asistente y tu dashboard estarán funcionando perfectamente en producción.

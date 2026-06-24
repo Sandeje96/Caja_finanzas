@@ -18,6 +18,7 @@ from datetime import date
 from app.extensions import db
 from app.repositories.category_repository import CategoryRepository
 from app.repositories.transaction_repository import TransactionRepository
+from app.models.transaction import Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -33,70 +34,64 @@ class TransactionService:
         user_id: str,
         amount: float,
         description: str,
-        category_name: str = None,
-        transaction_date: date = None,
-        message_id: str = None,
-        ai_confidence: float = None,
-        source: str = 'whatsapp',
-    ):
+        category_name: str | None = None,
+        merchant: str | None = None,
+        message_id: str | None = None,
+        ai_confidence: float | None = None,
+    ) -> Transaction:
         """
-        Create a new expense transaction.
-        Automatically resolves category_name to the best matching Category.
-
-        Returns the created Transaction instance.
+        Creates a new expense transaction.
+        Amount will be forced negative.
         """
-        category = self._resolve_category(category_name, user_id)
-        is_confirmed = (ai_confidence is not None and ai_confidence >= 0.85)
+        abs_amount = abs(float(amount))
+        category_id = self._resolve_category(user_id, category_name, 'expense')
 
-        transaction = _transaction_repo.create(
+        t = Transaction(
             user_id=user_id,
-            category_id=category.id if category else None,
-            message_id=message_id,
+            amount=abs_amount,
             type='expense',
-            amount=amount,
+            merchant=merchant,
             description=description,
-            transaction_date=transaction_date or date.today(),
-            source=source,
+            category_id=category_id,
+            message_id=message_id,
             ai_confidence=ai_confidence,
-            is_confirmed=is_confirmed
+            source='whatsapp'
         )
-        _transaction_repo.save()
-        return transaction
+        db.session.add(t)
+        db.session.commit()
+        logger.info(f"[TransactionService] Expense created for user {user_id}: ${abs_amount}")
+        return t
 
     def create_income(
         self,
         user_id: str,
         amount: float,
         description: str,
-        category_name: str = None,
-        transaction_date: date = None,
-        message_id: str = None,
-        ai_confidence: float = None,
-        source: str = 'whatsapp',
-    ):
+        category_name: str | None = None,
+        message_id: str | None = None,
+        ai_confidence: float | None = None,
+    ) -> Transaction:
         """
-        Create a new income transaction.
-        Automatically resolves category_name to the best matching Category.
-
-        Returns the created Transaction instance.
+        Creates a new income transaction.
+        Amount will be forced positive.
         """
-        category = self._resolve_category(category_name, user_id)
-        is_confirmed = (ai_confidence is not None and ai_confidence >= 0.85)
+        abs_amount = abs(float(amount))
+        category_id = self._resolve_category(user_id, category_name, 'income')
 
-        transaction = _transaction_repo.create(
+        t = Transaction(
             user_id=user_id,
-            category_id=category.id if category else None,
-            message_id=message_id,
+            amount=abs_amount,
             type='income',
-            amount=amount,
             description=description,
-            transaction_date=transaction_date or date.today(),
-            source=source,
+            category_id=category_id,
+            message_id=message_id,
             ai_confidence=ai_confidence,
-            is_confirmed=is_confirmed
+            source='whatsapp'
         )
-        _transaction_repo.save()
-        return transaction
+        db.session.add(t)
+        db.session.commit()
+        logger.info(f"[TransactionService] Income created for user {user_id}: ${abs_amount}")
+        return t
 
     def update_transaction(
         self,
@@ -150,7 +145,6 @@ class TransactionService:
         t = self.get_last_transaction(user_id)
         if not t:
             return None
-        t.is_confirmed = True
         _transaction_repo.save()
         return t
 
@@ -163,7 +157,7 @@ class TransactionService:
         return t
 
     def update_last_transaction(self, user_id: str, amount: float = None, category_name: str = None, description: str = None):
-        """Updates and confirms the most recent transaction based on AI extraction."""
+        """Updates the most recent transaction based on AI extraction."""
         t = self.get_last_transaction(user_id)
         if not t:
             return None
@@ -176,7 +170,6 @@ class TransactionService:
         if description is not None:
             t.description = description
             
-        t.is_confirmed = True
         _transaction_repo.save()
         return t
 
@@ -193,28 +186,29 @@ class TransactionService:
             lines.append(f"• {t.transaction_date.strftime('%d/%m')} | {cat_name} | {sign}${float(t.amount):,.0f}".replace(',', '.'))
         return "\n".join(lines)
 
-    def _resolve_category(self, category_name: str, user_id: str):
+    def _resolve_category(self, user_id: str, category_name: str | None, transaction_type: str = 'both'):
         """
         Find the best matching category or fall back to 'Otros'.
-        Returns a Category instance (never None — always falls back).
+        Returns a Category ID.
         """
         if category_name:
             category = _category_repo.find_best_match(category_name, user_id)
             if category:
-                return category
+                return category.id
                 
             # Create category automatically if not found
             category = _category_repo.create(
                 user_id=user_id,
                 name=category_name.capitalize(),
-                type='both',
+                type=transaction_type,
                 is_system=False
             )
             _category_repo.save()
-            return category
+            return category.id
 
         # Fallback: always return 'Otros' so no transaction is category-less
         fallback = _category_repo.get_fallback_category(user_id)
         if not fallback:
             logger.error("[TransactionService] 'Otros' category not found — run flask seed-db")
-        return fallback
+            return None
+        return fallback.id

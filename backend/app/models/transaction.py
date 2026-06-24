@@ -46,6 +46,7 @@ class Transaction(BaseModel):
     # Always positive — direction is determined by `type`
     amount = Column(Numeric(15, 2), nullable=False)
 
+    merchant         = Column(String(255), nullable=True)
     description      = Column(Text,   nullable=True)
     notes            = Column(Text,   nullable=True)
     transaction_date = Column(Date,   nullable=False, default=date.today)
@@ -56,9 +57,6 @@ class Transaction(BaseModel):
 
     # AI extraction confidence: 0.000 to 1.000
     ai_confidence = Column(Numeric(4, 3), nullable=True)
-
-    # Future use: pending confirmation from user
-    is_confirmed = Column(Boolean, default=True, nullable=False)
 
     # ─── Constraints ──────────────────────────────────────────────────────────
     __table_args__ = (
@@ -99,7 +97,6 @@ class Transaction(BaseModel):
             'transaction_date': self.transaction_date.isoformat() if self.transaction_date else None,
             'source':           self.source,
             'ai_confidence':    float(self.ai_confidence) if self.ai_confidence else None,
-            'is_confirmed':     self.is_confirmed,
             # Eager-loaded category name for convenience
             'category_name':    self.category.name if self.category else None,
             'category_icon':    self.category.icon if self.category else None,

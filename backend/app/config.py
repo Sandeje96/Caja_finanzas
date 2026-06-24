@@ -15,6 +15,7 @@ class Config:
 
     # ─── Flask ───────────────────────────────────────────────────────────────
     SECRET_KEY: str = os.environ.get('SECRET_KEY', 'dev-secret-key-CHANGE-IN-PRODUCTION')
+    FRONTEND_URL: str = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
     # ─── SQLAlchemy ───────────────────────────────────────────────────────────
     SQLALCHEMY_DATABASE_URI: str = os.environ.get(
@@ -69,7 +70,7 @@ class ProductionConfig(Config):
 
     def __init__(self):
         # Enforce required secrets in production
-        required = ['SECRET_KEY', 'JWT_SECRET_KEY', 'DATABASE_URL']
+        required = ['SECRET_KEY', 'JWT_SECRET_KEY', 'DATABASE_URL', 'FRONTEND_URL']
         for var in required:
             if not os.environ.get(var):
                 raise RuntimeError(f"Missing required environment variable: {var}")
@@ -83,6 +84,7 @@ class TestingConfig(Config):
         'postgresql://finanzas_user:finanzas_pass@localhost:5432/finanzas_ia_test',
     )
     SQLALCHEMY_ECHO: bool = False
+    SQLALCHEMY_ENGINE_OPTIONS: dict = {}
 
 
 config: dict = {

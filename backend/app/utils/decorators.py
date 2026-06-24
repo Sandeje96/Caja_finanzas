@@ -31,10 +31,29 @@ def jwt_required(f):
     """
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        # TODO: Sprint 6 — validate Bearer token, set g.current_user_id
-        return jsonify({
-            'error': 'Authentication not implemented yet — Sprint 6',
-        }), 501
+        from flask import g
+        from app.services.auth_service import AuthService
+        from app.models.user import User
+        
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Autenticación requerida. Token no proporcionado.'}), 401
+            
+        token = auth_header.split(' ')[1]
+        try:
+            auth_service = AuthService()
+            claims = auth_service.validate_access_token(token)
+            user = User.query.get(claims['user_id'])
+            if not user:
+                return jsonify({'error': 'Usuario no encontrado.'}), 404
+            
+            # Pass user to the route via g
+            g.current_user = user
+            g.current_user_id = user.id
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 401
+            
+        return f(*args, **kwargs)
     return decorated
 
 

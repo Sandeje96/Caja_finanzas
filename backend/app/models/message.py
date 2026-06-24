@@ -9,7 +9,7 @@ Key field:
   Used for deduplication: WhatsApp may re-send the same webhook event
   (at-least-once delivery). A UNIQUE constraint prevents double-processing.
 """
-from sqlalchemy import CheckConstraint, Column, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, Column, ForeignKey, String, Text, UniqueConstraint, JSON
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.extensions import db
@@ -24,11 +24,11 @@ class Message(BaseModel):
 
     # ─── WhatsApp deduplication key ───────────────────────────────────────────
     # Unique index ensures we never process the same message twice
-    whatsapp_message_id = Column(String(100), unique=True, nullable=True)
+    whatsapp_message_id = Column(String(100), index=True, nullable=True)
 
     # ─── Content ──────────────────────────────────────────────────────────────
     # 'user' = from WhatsApp user | 'assistant' = from AI | 'system' = internal
-    role = Column(String(10), nullable=False)
+    role = Column(String(10), nullable=False, default='user')
 
     content = Column(Text, nullable=False)
 
@@ -36,7 +36,7 @@ class Message(BaseModel):
     message_type = Column(String(20), default='text', nullable=False)
 
     # Full raw WhatsApp webhook payload (for auditing and future features)
-    raw_payload = Column(JSONB, nullable=True)
+    raw_payload = Column(JSON().with_variant(JSONB, 'postgresql'), nullable=True)
 
     # ─── Constraints ──────────────────────────────────────────────────────────
     __table_args__ = (

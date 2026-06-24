@@ -5,11 +5,20 @@ INTENCIONES POSIBLES:
 - REGISTER_INCOME: el usuario quiere registrar un ingreso
 - ATTACH_RECEIPT: el usuario está enviando o mencionando un comprobante/ticket/factura
 - CONFIRM_TRANSACTION: el usuario confirma un movimiento pendiente (ok, sí, dale, confirmar)
-- UPDATE_TRANSACTION: el usuario quiere corregir o modificar el monto, categoría o descripción de su último movimiento
+- CANCEL_TRANSACTION: el usuario cancela una acción pendiente o se arrepiente (no, cancelar, olvidalo)
+- UPDATE_TRANSACTION: el usuario quiere corregir o modificar el monto, categoría o descripción
 - DELETE_TRANSACTION: el usuario quiere borrar, eliminar o deshacer su último movimiento
-- QUERY_RECENT: el usuario pide ver sus últimos movimientos o gastos recientes
-- QUERY_RECEIPT: el usuario pide ver el comprobante, ticket o factura de su último gasto
-- QUERY: el usuario hace una pregunta analítica sobre sus finanzas
+- QUERY_RECENT: el usuario pide ver sus últimos movimientos
+- QUERY_RECEIPT: el usuario pide ver el comprobante de su último gasto
+- QUERY_MONTH_EXPENSES: el usuario pregunta cuánto gastó en el mes (ej. "cuánto gasté este mes")
+- QUERY_MONTH_INCOME: el usuario pregunta cuánto ingresó en el mes
+- QUERY_BALANCE: el usuario pregunta por su balance o cuánto le queda disponible
+- QUERY_CATEGORY_EXPENSES: el usuario pregunta cuánto gastó en una categoría específica
+- QUERY_TOP_CATEGORY: el usuario pregunta en qué categoría gastó más
+- QUERY_BIGGEST_EXPENSE: el usuario pregunta cuál fue su gasto más grande
+- QUERY_COMPARE_MONTHS: el usuario compara gastos entre meses (ej. "gasté más que el mes pasado")
+- QUERY_RECEIPT_SEARCH: el usuario busca el ticket o comprobante de un comercio específico
+- QUERY_DATE_EXPENSES: el usuario pide ver sus gastos de una fecha específica (ej. "gastos de ayer")
 - HELP: el usuario necesita ayuda o no sabe qué puede hacer
 - UNKNOWN: el mensaje no se puede clasificar con certeza
 
@@ -18,12 +27,11 @@ EJEMPLOS:
 "cobré 850 mil de sueldo" → REGISTER_INCOME
 "ok" → CONFIRM_TRANSACTION
 "no, fueron 20 lucas" → UPDATE_TRANSACTION
-"cambiá la categoría a supermercado" → UPDATE_TRANSACTION
 "borrá el último gasto" → DELETE_TRANSACTION
-"mis últimos movimientos" → QUERY_RECENT
-"mostrame el comprobante del último gasto" → QUERY_RECEIPT
-"ver último comprobante" → QUERY_RECEIPT
-"cuánto gasté este mes" → QUERY
+"cuánto gasté en combustible este mes" → QUERY_CATEGORY_EXPENSES
+"gasté más que el mes pasado?" → QUERY_COMPARE_MONTHS
+"buscame el ticket de Carrefour" → QUERY_RECEIPT_SEARCH
+"mostrame mis gastos de ayer" → QUERY_DATE_EXPENSES
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
 {
@@ -33,15 +41,17 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
     "amount": 15000,
     "category": "Combustible",
     "description": "combustible",
-    "date": null
+    "date": null,
+    "merchant": null
   }
 }
 
 REGLAS:
 - "confidence" debe ser un número entre 0 y 1
-- Para extraer las "entities", respeta que "amount" sea numérico convertido (ej. 15 lucas = 15000, 850 mil = 850000, 2 palos = 2000000, medio palo = 500000).
-- "category" debe ser el nombre de categoría más probable, o null
-- "date" debe ser una fecha ISO 8601 si se menciona, o null para hoy
-- Si la intención es QUERY, UPDATE_TRANSACTION, HELP o UNKNOWN, "entities" puede ser {}
+- Para extraer las "entities", respeta que "amount" sea numérico convertido (ej. 15 lucas = 15000).
+- "category" debe ser el nombre de categoría más probable (usado en registros y QUERY_CATEGORY_EXPENSES).
+- "date" debe ser una fecha ISO 8601 (YYYY-MM-DD) si se menciona una fecha exacta (ej. "ayer"), o null.
+- "merchant" extrae el nombre del comercio si se menciona explícitamente (ej. para QUERY_RECEIPT_SEARCH).
+- Si no hay entidades relevantes para la intención, usa null o {}.
 - Responde SOLO con el JSON validado (sin bloques de código markdown ni texto adicional).
 - FECHA DE HOY: {today}
