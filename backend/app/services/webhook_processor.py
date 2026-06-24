@@ -92,65 +92,99 @@ class WebhookProcessor:
 
         # 6. AI Processing & Transaction Logic
         if msg_type == 'text' and content:
-            context = _conversation_service.build_ai_context(conversation.id)
+            text_lower = content.strip().lower()
             
-            # Use AIService to classify intent and extract entities
-            from app.services.ai_service import AIService
             from app.services.transaction_service import TransactionService
-            
-            ai_service = AIService()
             transaction_service = TransactionService()
-            
-            ai_result = ai_service.classify_intent(
-                message=content,
-                context=context,
-                user_id=str(user.id),
-                message_id=str(user_msg.id)
-            )
-            
-            intent = ai_result.get('intent')
-            confidence = ai_result.get('confidence', 0.0)
-            entities = ai_result.get('entities', {})
-            
-            if intent in ('REGISTER_EXPENSE', 'REGISTER_INCOME'):
-                amount = entities.get('amount')
-                if not amount:
-                    reply_text = "No logré detectar el monto. Por favor, indicalo nuevamente."
+
+            # Fast-path for simple confirmations without using AI
+            if text_lower in ('ok', 'si', 'sí', 'dale', 'confirmar'):
+                t = transaction_service.confirm_last_transaction(user.id)
+                if t:
+                    reply_text = f"✅ Movimiento confirmado (${float(t.amount):,.0f})".replace(',', '.')
                 else:
-                    category_name = entities.get('category')
-                    desc = entities.get('description', '')
-                    
-                    if intent == 'REGISTER_EXPENSE':
-                        t = transaction_service.create_expense(
-                            user_id=user.id,
-                            amount=amount,
-                            description=desc,
-                            category_name=category_name,
-                            message_id=user_msg.id,
-                            ai_confidence=confidence
-                        )
-                        verb = "Gasto registrado"
-                    else:
-                        t = transaction_service.create_income(
-                            user_id=user.id,
-                            amount=amount,
-                            description=desc,
-                            category_name=category_name,
-                            message_id=user_msg.id,
-                            ai_confidence=confidence
-                        )
-                        verb = "Ingreso registrado"
-                        
-                    formatted_date = t.transaction_date.strftime('%d/%m/%Y')
-                    cat_name = t.category.name if t.category else 'Otros'
-                    formatted_amount = f"{float(t.amount):,.0f}".replace(',', '.')
-                    
-                    if t.is_confirmed:
-                        reply_text = f"✅ {verb}\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}"
-                    else:
-                        reply_text = f"⚠️ Por favor confirmá este {verb.lower()}:\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}\n\nRespondé OK para confirmar."
+                    reply_text = "No tenés ningún movimiento reciente pendiente de confirmación."
             else:
-                reply_text = f"No entendí bien tu solicitud (Intent detectado: {intent}). Solo registro gastos e ingresos por ahora."
+                context = _conversation_service.build_ai_context(conversation.id)
+                
+                # Use AIService to classify intent and extract entities
+                from app.services.ai_service import AIService
+                ai_service = AIService()
+                
+                ai_result = ai_service.classify_intent(
+                    message=content,
+                    context=context,
+                    user_id=str(user.id),
+                    message_id=str(user_msg.id)
+                )
+                
+                intent = ai_result.get('intent')
+                confidence = ai_result.get('confidence', 0.0)
+                entities = ai_result.get('entities', {})
+                
+                if intent in ('REGISTER_EXPENSE', 'REGISTER_INCOME'):
+                    amount = entities.get('amount')
+                    if not amount:
+                        reply_text = "No logré detectar el monto. Por favor, indicalo nuevamente."
+                    else:
+                        category_name = entities.get('category')
+                        desc = entities.get('description', '')
+                        
+                        if intent == 'REGISTER_EXPENSE':
+                            t = transaction_service.create_expense(
+                                user_id=user.id,
+                                amount=amount,
+                                description=desc,
+                                category_name=category_name,
+                                message_id=user_msg.id,
+                                ai_confidence=confidence
+                            )
+                            verb = "Gasto registrado"
+                        else:
+                            t = transaction_service.create_income(
+                                user_id=user.id,
+                                amount=amount,
+                                description=desc,
+                                category_name=category_name,
+                                message_id=user_msg.id,
+                                ai_confidence=confidence
+                            )
+                            verb = "Ingreso registrado"
+                            
+                        formatted_date = t.transaction_date.strftime('%d/%m/%Y')
+                        cat_name = t.category.name if t.category else 'Otros'
+                        formatted_amount = f"{float(t.amount):,.0f}".replace(',', '.')
+                        
+                        if t.is_confirmed:
+                            reply_text = f"✅ {verb}\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}"
+                        else:
+                            reply_text = f"⚠️ Por favor confirmá este {verb.lower()}:\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}\n\nRespondé OK para confirmar."
+                elif intent == 'CONFIRM_TRANSACTION':
+                    t = transaction_service.confirm_last_transaction(user.id)
+                    if t:
+                        reply_text = f"✅ Movimiento confirmado (${float(t.amount):,.0f})".replace(',', '.')
+                    else:
+                        reply_text = "No encontré ningún movimiento reciente para confirmar."
+                elif intent == 'UPDATE_TRANSACTION':
+                    amount = entities.get('amount')
+                    category_name = entities.get('category')
+                    desc = entities.get('description')
+                    t = transaction_service.update_last_transaction(user.id, amount=amount, category_name=category_name, description=desc)
+                    if t:
+                        cat_name = t.category.name if t.category else 'Otros'
+                        reply_text = f"✅ Movimiento actualizado y confirmado.\n\nMonto: ${float(t.amount):,.0f}\nCategoría: {cat_name}".replace(',', '.')
+                    else:
+                        reply_text = "No encontré ningún movimiento reciente para actualizar."
+                elif intent == 'DELETE_TRANSACTION':
+                    t = transaction_service.delete_last_transaction(user.id)
+                    if t:
+                        reply_text = f"🗑️ Movimiento eliminado (${float(t.amount):,.0f})".replace(',', '.')
+                    else:
+                        reply_text = "No encontré ningún movimiento reciente para eliminar."
+                elif intent == 'QUERY_RECENT':
+                    reply_text = transaction_service.get_recent_transactions_text(user.id, limit=5)
+                else:
+                    reply_text = f"No entendí bien tu solicitud (Intent detectado: {intent}). Solo registro gastos e ingresos por ahora."
         else:
             reply_text = "Por ahora solo puedo procesar mensajes de texto. Los comprobantes se agregarán luego."
 

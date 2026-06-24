@@ -4,18 +4,23 @@ INTENCIONES POSIBLES:
 - REGISTER_EXPENSE: el usuario quiere registrar un gasto
 - REGISTER_INCOME: el usuario quiere registrar un ingreso
 - ATTACH_RECEIPT: el usuario está enviando o mencionando un comprobante/ticket/factura
-- QUERY: el usuario hace una pregunta sobre sus finanzas
-- UPDATE_TRANSACTION: el usuario quiere corregir o modificar un movimiento anterior
+- CONFIRM_TRANSACTION: el usuario confirma un movimiento pendiente (ok, sí, dale, confirmar)
+- UPDATE_TRANSACTION: el usuario quiere corregir o modificar el monto, categoría o descripción de su último movimiento
+- DELETE_TRANSACTION: el usuario quiere borrar, eliminar o deshacer su último movimiento
+- QUERY_RECENT: el usuario pide ver sus últimos movimientos o gastos recientes
+- QUERY: el usuario hace una pregunta analítica sobre sus finanzas
 - HELP: el usuario necesita ayuda o no sabe qué puede hacer
 - UNKNOWN: el mensaje no se puede clasificar con certeza
 
 EJEMPLOS:
 "gasté 15 lucas en combustible" → REGISTER_EXPENSE
 "cobré 850 mil de sueldo" → REGISTER_INCOME
-"te mando el ticket" → ATTACH_RECEIPT
+"ok" → CONFIRM_TRANSACTION
+"no, fueron 20 lucas" → UPDATE_TRANSACTION
+"cambiá la categoría a supermercado" → UPDATE_TRANSACTION
+"borrá el último gasto" → DELETE_TRANSACTION
+"mis últimos movimientos" → QUERY_RECENT
 "cuánto gasté este mes" → QUERY
-"en realidad eran 20000, no 18000" → UPDATE_TRANSACTION
-"qué puedo hacer acá" → HELP
 
 Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
 {
