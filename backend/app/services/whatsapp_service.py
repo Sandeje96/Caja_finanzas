@@ -65,14 +65,15 @@ class WhatsAppService:
         }
 
         phone_id = current_app.config.get('WHATSAPP_PHONE_NUMBER_ID', '')
+        token = current_app.config.get('WHATSAPP_TOKEN', '')
+        token_status = "PRESENTE" if token else "AUSENTE"
         url = f"{self._base_url()}/messages"
         
         logger.info(
-            f"[WhatsApp] Preparando envío.\n"
-            f"URL: {url}\n"
-            f"Phone Number ID: {phone_id}\n"
-            f"Destino: {to_phone}\n"
-            f"Payload: {payload}"
+            f"\nPOST URL:\n{url}\n\n"
+            f"Phone Number ID:\n{phone_id}\n\n"
+            f"Token:\n{token_status}\n\n"
+            f"Payload:\n{payload}\n"
         )
 
         for attempt in range(MAX_RETRIES + 1):
