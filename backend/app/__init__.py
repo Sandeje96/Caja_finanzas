@@ -5,6 +5,7 @@ Usage:
     from app import create_app
     app = create_app('development')
 """
+import os
 import logging
 from datetime import datetime, timezone
 
@@ -57,26 +58,28 @@ def _init_extensions(app: Flask) -> None:
     # CORS Configuration
     frontend_url_env = app.config.get('FRONTEND_URL', '')
     
-    # Permitir temporalmente múltiples orígenes solicitados más el del env
+    # Orígenes exactos permitidos
     allowed_origins = [
-        "http://localhost:5173",
-        "https://caja-finanzas-caja-finanza.vercel.app",
-        "https://caja-finanzas-wheat.vercel.app"
+        "http://localhost:5173"
     ]
     
-    # Agregar FRONTEND_URL si no está en la lista y no está vacío
-    if frontend_url_env and frontend_url_env not in allowed_origins:
-        # Si vienen varios separados por coma en el env, los dividimos
+    if frontend_url_env:
         env_origins = [url.strip() for url in frontend_url_env.split(',')]
         for url in env_origins:
             if url and url not in allowed_origins:
                 allowed_origins.append(url)
 
-    logger.info(f"[CORS] Inicializando Flask-CORS. Orígenes permitidos: {allowed_origins}")
+    import re
+    # Patrón Regex para aceptar cualquier subdominio preview de Vercel para este proyecto
+    vercel_regex = re.compile(r"^https://caja-finanzas-.*\.vercel\.app$")
+    
+    origins_config = allowed_origins + [vercel_regex]
+
+    logger.info(f"[CORS] Inicializando Flask-CORS. Orígenes estáticos: {allowed_origins}. Regex: {vercel_regex.pattern}")
 
     CORS(app, resources={
         r"/api/*": {
-            "origins": allowed_origins,
+            "origins": origins_config,
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             "allow_headers": ["Authorization", "Content-Type"],
             "supports_credentials": True
