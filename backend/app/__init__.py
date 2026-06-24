@@ -54,9 +54,34 @@ def create_app(config_name: str = 'default') -> Flask:
 
 def _init_extensions(app: Flask) -> None:
     """Initialize and bind Flask extensions to the app."""
-    # CORS: restrict to FRONTEND_URL
-    frontend_url = app.config.get('FRONTEND_URL', 'http://localhost:5173')
-    CORS(app, resources={r"/api/*": {"origins": frontend_url}})
+    # CORS Configuration
+    frontend_url_env = app.config.get('FRONTEND_URL', '')
+    
+    # Permitir temporalmente múltiples orígenes solicitados más el del env
+    allowed_origins = [
+        "http://localhost:5173",
+        "https://caja-finanzas-caja-finanza.vercel.app",
+        "https://caja-finanzas-wheat.vercel.app"
+    ]
+    
+    # Agregar FRONTEND_URL si no está en la lista y no está vacío
+    if frontend_url_env and frontend_url_env not in allowed_origins:
+        # Si vienen varios separados por coma en el env, los dividimos
+        env_origins = [url.strip() for url in frontend_url_env.split(',')]
+        for url in env_origins:
+            if url and url not in allowed_origins:
+                allowed_origins.append(url)
+
+    logger.info(f"[CORS] Inicializando Flask-CORS. Orígenes permitidos: {allowed_origins}")
+
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": allowed_origins,
+            "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            "allow_headers": ["Authorization", "Content-Type"],
+            "supports_credentials": True
+        }
+    })
 
     # Import all models BEFORE calling migrate.init_app so Alembic
     # can detect every table during autogenerate.
