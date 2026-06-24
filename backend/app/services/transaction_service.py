@@ -11,8 +11,6 @@ Category resolution strategy:
   1. Try exact name match (case-insensitive)
   2. Try partial name match (ILIKE '%name%')
   3. Fallback to 'Otros' category if nothing matches
-
-TODO: Implement core methods in Sprint 3.
 """
 import logging
 from datetime import date
@@ -46,10 +44,24 @@ class TransactionService:
         Automatically resolves category_name to the best matching Category.
 
         Returns the created Transaction instance.
-
-        TODO: Implement in Sprint 3.
         """
-        raise NotImplementedError("Sprint 3")
+        category = self._resolve_category(category_name, user_id)
+        is_confirmed = (ai_confidence is not None and ai_confidence >= 0.85)
+
+        transaction = _transaction_repo.create(
+            user_id=user_id,
+            category_id=category.id if category else None,
+            message_id=message_id,
+            type='expense',
+            amount=amount,
+            description=description,
+            transaction_date=transaction_date or date.today(),
+            source=source,
+            ai_confidence=ai_confidence,
+            is_confirmed=is_confirmed
+        )
+        _transaction_repo.save()
+        return transaction
 
     def create_income(
         self,
@@ -67,10 +79,24 @@ class TransactionService:
         Automatically resolves category_name to the best matching Category.
 
         Returns the created Transaction instance.
-
-        TODO: Implement in Sprint 3.
         """
-        raise NotImplementedError("Sprint 3")
+        category = self._resolve_category(category_name, user_id)
+        is_confirmed = (ai_confidence is not None and ai_confidence >= 0.85)
+
+        transaction = _transaction_repo.create(
+            user_id=user_id,
+            category_id=category.id if category else None,
+            message_id=message_id,
+            type='income',
+            amount=amount,
+            description=description,
+            transaction_date=transaction_date or date.today(),
+            source=source,
+            ai_confidence=ai_confidence,
+            is_confirmed=is_confirmed
+        )
+        _transaction_repo.save()
+        return transaction
 
     def update_transaction(
         self,
@@ -119,6 +145,16 @@ class TransactionService:
             category = _category_repo.find_best_match(category_name, user_id)
             if category:
                 return category
+                
+            # Create category automatically if not found
+            category = _category_repo.create(
+                user_id=user_id,
+                name=category_name.capitalize(),
+                type='both',
+                is_system=False
+            )
+            _category_repo.save()
+            return category
 
         # Fallback: always return 'Otros' so no transaction is category-less
         fallback = _category_repo.get_fallback_category(user_id)

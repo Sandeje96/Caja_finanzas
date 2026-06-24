@@ -80,7 +80,7 @@ class WebhookProcessor:
         conversation = _conversation_service.get_or_create_active_conversation(user.id)
 
         # 5. Persist incoming message
-        _conversation_service.save_user_message(
+        user_msg = _conversation_service.save_user_message(
             conversation_id=conversation.id,
             content=content if content else f"[{msg_type} message]",
             message_type=msg_type,
@@ -90,10 +90,70 @@ class WebhookProcessor:
 
         logger.info(f"[WebhookProcessor] Received {msg_type} from {normalized_phone}: {content}")
 
-        # MVP Sprint 2 output
-        # For now, just send a simple acknowledgment
-        reply_text = f"Mensaje recibido y guardado. Contenido: {content}"
-        
+        # 6. AI Processing & Transaction Logic
+        if msg_type == 'text' and content:
+            context = _conversation_service.build_ai_context(conversation.id)
+            
+            # Use AIService to classify intent and extract entities
+            from app.services.ai_service import AIService
+            from app.services.transaction_service import TransactionService
+            
+            ai_service = AIService()
+            transaction_service = TransactionService()
+            
+            ai_result = ai_service.classify_intent(
+                message=content,
+                context=context,
+                user_id=str(user.id),
+                message_id=str(user_msg.id)
+            )
+            
+            intent = ai_result.get('intent')
+            confidence = ai_result.get('confidence', 0.0)
+            entities = ai_result.get('entities', {})
+            
+            if intent in ('REGISTER_EXPENSE', 'REGISTER_INCOME'):
+                amount = entities.get('amount')
+                if not amount:
+                    reply_text = "No logré detectar el monto. Por favor, indicalo nuevamente."
+                else:
+                    category_name = entities.get('category')
+                    desc = entities.get('description', '')
+                    
+                    if intent == 'REGISTER_EXPENSE':
+                        t = transaction_service.create_expense(
+                            user_id=user.id,
+                            amount=amount,
+                            description=desc,
+                            category_name=category_name,
+                            message_id=user_msg.id,
+                            ai_confidence=confidence
+                        )
+                        verb = "Gasto registrado"
+                    else:
+                        t = transaction_service.create_income(
+                            user_id=user.id,
+                            amount=amount,
+                            description=desc,
+                            category_name=category_name,
+                            message_id=user_msg.id,
+                            ai_confidence=confidence
+                        )
+                        verb = "Ingreso registrado"
+                        
+                    formatted_date = t.transaction_date.strftime('%d/%m/%Y')
+                    cat_name = t.category.name if t.category else 'Otros'
+                    formatted_amount = f"{float(t.amount):,.0f}".replace(',', '.')
+                    
+                    if t.is_confirmed:
+                        reply_text = f"✅ {verb}\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}"
+                    else:
+                        reply_text = f"⚠️ Por favor confirmá este {verb.lower()}:\n\nMonto: ${formatted_amount}\nCategoría: {cat_name}\nFecha: {formatted_date}\n\nRespondé OK para confirmar."
+            else:
+                reply_text = f"No entendí bien tu solicitud (Intent detectado: {intent}). Solo registro gastos e ingresos por ahora."
+        else:
+            reply_text = "Por ahora solo puedo procesar mensajes de texto. Los comprobantes se agregarán luego."
+
         # 9. Persist assistant response message
         _conversation_service.save_assistant_message(conversation.id, reply_text)
         
