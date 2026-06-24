@@ -1,0 +1,38 @@
+Analiza el siguiente mensaje del usuario y clasifica su intención.
+
+INTENCIONES POSIBLES:
+- REGISTER_EXPENSE: el usuario quiere registrar un gasto
+- REGISTER_INCOME: el usuario quiere registrar un ingreso
+- ATTACH_RECEIPT: el usuario está enviando o mencionando un comprobante/ticket/factura
+- QUERY: el usuario hace una pregunta sobre sus finanzas
+- UPDATE_TRANSACTION: el usuario quiere corregir o modificar un movimiento anterior
+- HELP: el usuario necesita ayuda o no sabe qué puede hacer
+- UNKNOWN: el mensaje no se puede clasificar con certeza
+
+EJEMPLOS:
+"gasté 18000 en supermercado" → REGISTER_EXPENSE
+"cobré 850000 de sueldo" → REGISTER_INCOME
+"te mando el ticket" → ATTACH_RECEIPT
+"cuánto gasté este mes" → QUERY
+"en realidad eran 20000, no 18000" → UPDATE_TRANSACTION
+"qué puedo hacer acá" → HELP
+
+Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
+{
+  "intent": "REGISTER_EXPENSE",
+  "confidence": 0.97,
+  "entities": {
+    "amount": 18000,
+    "category": "Supermercado",
+    "description": "supermercado",
+    "date": null
+  }
+}
+
+REGLAS:
+- "confidence" debe ser un número entre 0 y 1
+- "amount" debe ser un número positivo sin signo, o null si no se menciona
+- "category" debe ser el nombre de categoría más probable, o null
+- "date" debe ser una fecha ISO 8601 si se menciona, o null para hoy
+- Si la intención es QUERY, UPDATE_TRANSACTION, HELP o UNKNOWN, "entities" puede ser {}
+- Responde SOLO con el JSON, sin texto adicional

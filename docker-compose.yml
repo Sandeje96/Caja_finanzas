@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL Database ────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: finanzas_ia_db
+    environment:
+      POSTGRES_DB: finanzas_ia
+      POSTGRES_USER: finanzas_user
+      POSTGRES_PASSWORD: finanzas_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finanzas_user -d finanzas_ia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── Flask Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: finanzas_ia_backend
+    ports:
+      - "5000:5000"
+    environment:
+      # Core Flask
+      FLASK_APP: run.py
+      FLASK_ENV: development
+      SECRET_KEY: dev-secret-key-CHANGE-IN-PRODUCTION
+      PORT: 5000
+
+      # Database — overrides whatever is in .env for Docker networking
+      DATABASE_URL: postgresql://finanzas_user:finanzas_pass@db:5432/finanzas_ia
+
+      # JWT (stubs — implement in Sprint 6)
+      JWT_SECRET_KEY: dev-jwt-secret-CHANGE-IN-PRODUCTION
+      JWT_ACCESS_TOKEN_EXPIRES: 900
+      JWT_REFRESH_TOKEN_EXPIRES: 604800
+
+      # WhatsApp Cloud API (configure when you have a Business number)
+      WHATSAPP_TOKEN: ""
+      WHATSAPP_VERIFY_TOKEN: my_verify_token_dev
+      WHATSAPP_PHONE_NUMBER_ID: ""
+      WHATSAPP_API_VERSION: v18.0
+
+      # OpenAI (configure before Sprint 3)
+      OPENAI_API_KEY: ""
+      OPENAI_MODEL_FAST: gpt-4o-mini
+      OPENAI_MAX_CONTEXT_MESSAGES: 10
+
+      # Supabase Storage (configure before Sprint 4)
+      SUPABASE_URL: ""
+      SUPABASE_KEY: ""
+      SUPABASE_BUCKET_RECEIPTS: receipts
+
+      # App defaults
+      DEFAULT_TIMEZONE: America/Argentina/Buenos_Aires
+      DEFAULT_CURRENCY: ARS
+      RATE_LIMIT_PER_MINUTE: 30
+
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Hot-reload: mounts local source code into container
+      - ./backend:/app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: finanzas_ia_postgres_data

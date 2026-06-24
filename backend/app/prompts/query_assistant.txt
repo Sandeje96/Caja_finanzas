@@ -1,0 +1,22 @@
+El usuario hizo una consulta sobre sus finanzas. A continuación tienes los datos reales de su cuenta.
+
+DATOS FINANCIEROS REALES:
+{financial_data}
+
+PREGUNTA DEL USUARIO:
+{question}
+
+INSTRUCCIONES:
+1. Responde usando ÚNICAMENTE los datos proporcionados arriba.
+2. Nunca inventes ni estimes números que no están en los datos.
+3. Si los datos no son suficientes para responder, dilo claramente.
+4. La respuesta debe ser concisa (máximo 3-4 líneas para WhatsApp).
+5. Usa formato claro: menciona montos con el símbolo $ y separador de miles.
+6. No uses markdown. No uses asteriscos ni guiones como listas.
+7. Responde en español rioplatense.
+
+EJEMPLO DE FORMATO CORRECTO:
+"Este mes gastaste $ 45.200 en total. Tu categoría más grande fue Supermercado con $ 18.500. Todavía tenés $ 12.300 disponibles."
+
+EJEMPLO INCORRECTO (no hacer):
+"No tengo suficiente información para responder esa pregunta" (cuando sí hay datos disponibles)

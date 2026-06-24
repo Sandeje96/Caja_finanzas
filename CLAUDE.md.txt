@@ -1,0 +1,555 @@
+CLAUDE.md
+Nombre del Proyecto
+
+FINANZAS IA WHATSAPP
+
+Visión del Producto
+
+Construir un asistente financiero personal impulsado por IA cuya interfaz principal sea WhatsApp.
+
+El usuario debe poder registrar gastos, ingresos, comprobantes y realizar consultas financieras simplemente conversando de forma natural.
+
+El sistema debe actuar como un contador personal inteligente que recuerda todas las operaciones y permite consultar información histórica mediante lenguaje natural.
+
+El usuario nunca debería necesitar completar formularios para registrar movimientos.
+
+Propuesta de Valor
+
+No somos una aplicación de gastos.
+
+Somos un asistente financiero conversacional.
+
+El usuario debe sentir que está hablando con alguien que conoce toda su situación financiera.
+
+Ejemplos:
+
+"gasté 15000 en combustible"
+
+"cobré 850000"
+
+"te envío el ticket"
+
+"cuánto gasté en comida este mes"
+
+"buscame la factura de internet"
+
+"estoy gastando más que el mes pasado"
+
+"cuánto dinero tengo disponible"
+
+Stack Tecnológico
+
+Frontend:
+
+React
+Vite
+TailwindCSS
+Recharts
+
+Backend:
+
+Flask
+SQLAlchemy
+Alembic
+
+Base de Datos:
+
+PostgreSQL
+
+Almacenamiento:
+
+Supabase Storage
+Compatible S3
+
+Infraestructura:
+
+Railway
+GitHub
+
+IA:
+
+OpenAI API
+
+Canal:
+
+WhatsApp Cloud API
+Arquitectura
+
+WhatsApp
+
+↓
+
+Webhook Flask
+
+↓
+
+Procesador IA
+
+↓
+
+Motor de Negocio
+
+↓
+
+PostgreSQL
+
+↓
+
+Dashboard Web
+
+Principios del Proyecto
+
+Priorizar simplicidad.
+
+Evitar sobreingeniería.
+
+Construir primero el flujo completo.
+
+Optimizar después.
+
+Toda funcionalidad debe funcionar correctamente desde WhatsApp.
+
+El dashboard es secundario.
+
+La experiencia conversacional es la prioridad.
+
+Módulos
+Módulo Usuarios
+
+Responsabilidades:
+
+registrar usuarios
+identificar por número telefónico
+preferencias
+configuración
+Módulo Conversaciones
+
+Responsabilidades:
+
+almacenar todos los mensajes
+almacenar contexto
+historial conversacional
+
+Nunca eliminar mensajes.
+
+Los mensajes son activos estratégicos para futuras funcionalidades.
+
+Módulo IA
+
+Responsabilidades:
+
+interpretar mensajes
+clasificar intención
+extraer entidades
+generar respuestas
+
+Tipos de intención:
+
+registrar gasto
+registrar ingreso
+adjuntar comprobante
+consulta financiera
+corrección
+ayuda
+Módulo Finanzas
+
+Responsabilidades:
+
+registrar movimientos
+actualizar movimientos
+consultar movimientos
+generar balances
+Módulo Comprobantes
+
+Responsabilidades:
+
+almacenar imágenes
+almacenar PDF
+asociar archivos a movimientos
+Módulo Dashboard
+
+Responsabilidades:
+
+métricas
+gráficos
+filtros
+visualización
+Modelo de Datos
+users
+
+id
+
+phone
+
+name
+
+timezone
+
+currency
+
+created_at
+
+updated_at
+
+deleted_at
+
+conversations
+
+id
+
+user_id
+
+started_at
+
+updated_at
+
+messages
+
+id
+
+conversation_id
+
+role
+
+content
+
+message_type
+
+created_at
+
+categories
+
+id
+
+name
+
+type
+
+icon
+
+created_at
+
+transactions
+
+id
+
+user_id
+
+category_id
+
+type
+
+amount
+
+description
+
+transaction_date
+
+source
+
+created_at
+
+updated_at
+
+deleted_at
+
+attachments
+
+id
+
+transaction_id
+
+storage_path
+
+public_url
+
+file_name
+
+mime_type
+
+file_size
+
+created_at
+
+ai_logs
+
+id
+
+user_id
+
+prompt
+
+response
+
+tokens
+
+created_at
+
+Tipos de Movimiento
+
+Ingreso
+
+Gasto
+
+Transferencia
+
+Ajuste
+
+Categorías Iniciales
+
+Supermercado
+
+Combustible
+
+Servicios
+
+Internet
+
+Telefonía
+
+Alquiler
+
+Expensas
+
+Salud
+
+Farmacia
+
+Restaurante
+
+Educación
+
+Impuestos
+
+Transporte
+
+Entretenimiento
+
+Mascotas
+
+Indumentaria
+
+Otros
+
+Flujo Registro de Gasto
+
+Usuario:
+
+Gasté 18000 en supermercado
+
+IA:
+
+Detectar intención
+
+Extraer monto
+
+Extraer categoría
+
+Crear transacción
+
+Responder confirmación
+
+Flujo Registro de Ingreso
+
+Usuario:
+
+Cobré 850000 de sueldo
+
+IA:
+
+Detectar ingreso
+
+Registrar movimiento
+
+Responder confirmación
+
+Flujo Adjuntar Comprobante
+
+Usuario:
+
+Gasté 25000 en combustible
+
+Usuario:
+
+[imagen]
+
+IA:
+
+Subir archivo
+
+Asociar al último movimiento compatible
+
+Confirmar operación
+
+Flujo Consulta Financiera
+
+Usuario:
+
+¿Cuánto gasté en combustible este mes?
+
+Proceso:
+
+Consultar base de datos
+
+Generar respuesta
+
+No inventar información
+
+Siempre responder con datos reales
+
+Consultas que Deben Funcionar
+
+¿Cuánto gasté este mes?
+
+¿Cuánto ingresé este mes?
+
+¿Cuánto me queda disponible?
+
+¿Cuál fue mi gasto más grande?
+
+¿En qué estoy gastando más?
+
+¿Cuánto gasté en combustible?
+
+¿Cuánto gasté la semana pasada?
+
+Mostrame mis últimos gastos.
+
+Buscame la factura de internet.
+
+¿Estoy gastando más que el mes pasado?
+
+Dashboard
+Home
+
+Balance actual
+
+Ingresos mes
+
+Gastos mes
+
+Ahorro neto
+
+Movimientos
+
+Tabla paginada
+
+Filtros:
+
+fecha
+
+categoría
+
+tipo
+
+texto
+
+Comprobantes
+
+Galería
+
+Búsqueda
+
+Vista previa
+
+Descarga
+
+Estadísticas
+
+Gastos por categoría
+
+Ingresos por mes
+
+Evolución temporal
+
+Top categorías
+
+Seguridad
+
+Autenticación JWT
+
+Validación de archivos
+
+Rate limiting
+
+Logs de auditoría
+
+Soft delete
+
+Variables sensibles mediante environment variables
+
+Nunca almacenar claves en repositorio
+
+Prompt Base de IA
+
+La IA debe actuar como un asistente financiero personal.
+
+Debe interpretar lenguaje natural.
+
+Debe ser precisa con montos.
+
+Nunca inventar movimientos.
+
+Nunca asumir datos inexistentes.
+
+Cuando tenga dudas debe solicitar aclaración.
+
+Las respuestas deben ser breves y orientadas a la acción.
+
+Roadmap
+
+Fase 1
+
+Registro de gastos
+
+Registro de ingresos
+
+Comprobantes
+
+Dashboard
+
+Consultas básicas
+
+Fase 2
+
+OCR de tickets
+
+Extracción automática de montos
+
+Búsqueda avanzada
+
+Exportación Excel
+
+Exportación PDF
+
+Fase 3
+
+Presupuestos
+
+Alertas
+
+Metas de ahorro
+
+Predicciones
+
+Comparativas mensuales
+
+Fase 4
+
+Multiusuario
+
+Grupos familiares
+
+Empresas
+
+Contadores
+
+SaaS
+
+Suscripciones
+
+Objetivo Final
+
+Que un usuario pueda administrar toda su vida financiera desde WhatsApp sin abrir una aplicación tradicional.
+
+Debe sentirse como conversar con un contador personal que recuerda absolutamente todo.

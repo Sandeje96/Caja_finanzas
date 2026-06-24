@@ -1,0 +1,3 @@
+# Railway reads this file to know how to start the service
+# flask db upgrade runs migrations before starting the server
+web: flask db upgrade && flask seed-db && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 run:app

@@ -1,0 +1,21 @@
+Extrae las entidades financieras del siguiente mensaje.
+
+ENTIDADES A EXTRAER:
+- amount: el monto mencionado (número positivo, sin símbolo de moneda)
+- category: la categoría del gasto/ingreso (usa los nombres de las categorías del sistema)
+- description: descripción breve del movimiento
+- date: fecha mencionada en formato ISO 8601 (YYYY-MM-DD), null si no se menciona
+
+CATEGORÍAS DEL SISTEMA:
+Gastos: Supermercado, Combustible, Servicios, Internet, Telefonía, Alquiler, Expensas, Salud, Farmacia, Restaurante, Educación, Impuestos, Transporte, Entretenimiento, Mascotas, Indumentaria, Otros
+Ingresos: Sueldo, Freelance, Alquiler Cobrado, Inversiones, Otros
+
+EJEMPLOS:
+"gasté 18000 en supermercado" → {"amount": 18000, "category": "Supermercado", "description": "supermercado", "date": null}
+"combustible 25000 ayer" → {"amount": 25000, "category": "Combustible", "description": "combustible", "date": "AYER_ISO"}
+"pagué la factura de luz 12500" → {"amount": 12500, "category": "Servicios", "description": "factura de luz", "date": null}
+"cobré el sueldo 950000" → {"amount": 950000, "category": "Sueldo", "description": "sueldo", "date": null}
+
+FECHA DE HOY: {today}
+
+Responde ÚNICAMENTE con un JSON. Sin texto adicional.
