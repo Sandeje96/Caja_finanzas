@@ -116,7 +116,9 @@ class AIService:
                 completion_tokens=usage.completion_tokens,
                 model=model,
                 latency_ms=latency,
-                success=True
+                success=True,
+                request_json=messages,
+                response_json=parsed
             )
             
             return parsed
@@ -133,7 +135,9 @@ class AIService:
                 model=model,
                 latency_ms=latency,
                 success=False,
-                error=str(e)
+                error=str(e),
+                request_json=messages,
+                response_json=None
             )
             return {'intent': INTENT_UNKNOWN, 'confidence': 0.0, 'entities': {}}
 
@@ -168,6 +172,8 @@ class AIService:
         latency_ms: int,
         success: bool = True,
         error: str = None,
+        request_json: list | dict | None = None,
+        response_json: dict | str | None = None,
     ) -> None:
         """
         Record an AI call in ai_logs table.
@@ -186,6 +192,8 @@ class AIService:
                 user_id=user_id,
                 message_id=message_id,
                 intent=intent,
+                request_json=request_json,
+                response_json=response_json,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=(prompt_tokens or 0) + (completion_tokens or 0),

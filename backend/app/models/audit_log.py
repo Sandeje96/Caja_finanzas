@@ -3,7 +3,7 @@ models/audit_log.py — Audit Log entity.
 
 Records all manual modifications made via the dashboard.
 """
-from sqlalchemy import Column, ForeignKey, String, Text
+from sqlalchemy import Column, ForeignKey, String, Text, JSON
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.extensions import db
@@ -20,7 +20,7 @@ class AuditLog(BaseModel):
     action = Column(String(50), nullable=False)
     
     # Changes saved as JSON { "field": {"old": val, "new": val} }
-    changes = Column(JSONB, nullable=False)
+    changes = Column(JSON().with_variant(JSONB, 'postgresql'), nullable=False)
     
     # ─── Relationships ────────────────────────────────────────────────────────
     user = db.relationship('User', backref=db.backref('audit_logs', lazy='dynamic', overlaps="ai_logs,attachments,categories,conversations,transactions"))

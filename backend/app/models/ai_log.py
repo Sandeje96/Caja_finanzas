@@ -10,8 +10,8 @@ Records every call made to OpenAI for:
 This table grows indefinitely — implement archival policy in production
 (e.g., move records older than 90 days to S3 cold storage).
 """
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Text, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.extensions import db
 from app.models.base import BaseModel
@@ -26,6 +26,10 @@ class AILog(BaseModel):
 
     # ─── Classification result ────────────────────────────────────────────────
     intent = Column(String(50), nullable=True)   # REGISTER_EXPENSE, QUERY, etc.
+
+    # ─── Raw Data ─────────────────────────────────────────────────────────────
+    request_json  = Column(JSON().with_variant(JSONB, 'postgresql'), nullable=True)
+    response_json = Column(JSON().with_variant(JSONB, 'postgresql'), nullable=True)
 
     # ─── Token usage ──────────────────────────────────────────────────────────
     prompt_tokens     = Column(Integer, nullable=True)
@@ -54,6 +58,8 @@ class AILog(BaseModel):
             'user_id':            str(self.user_id)    if self.user_id    else None,
             'message_id':         str(self.message_id) if self.message_id else None,
             'intent':             self.intent,
+            'request_json':       self.request_json,
+            'response_json':      self.response_json,
             'total_tokens':       self.total_tokens,
             'model':              self.model,
             'cost_usd':           float(self.cost_usd) if self.cost_usd else None,

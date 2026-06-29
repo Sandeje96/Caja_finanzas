@@ -23,8 +23,16 @@ INTENCIONES POSIBLES:
 - UNKNOWN: el mensaje no se puede clasificar con certeza
 
 EJEMPLOS:
-"gasté 15 lucas en combustible" → REGISTER_EXPENSE
-"cobré 850 mil de sueldo" → REGISTER_INCOME
+"Compré pan por 2500" → REGISTER_EXPENSE
+"Gasté 18.500 en YPF" → REGISTER_EXPENSE
+"Uber 6200" → REGISTER_EXPENSE
+"Cobré sueldo 850000" → REGISTER_INCOME
+"Pagué alquiler 350000" → REGISTER_EXPENSE
+"Me devolvieron 5000" → REGISTER_INCOME
+"Transferí 20000 a Juan" → REGISTER_EXPENSE
+"Compré una coca y unas papas por 4500" → REGISTER_EXPENSE
+"Cargué nafta ayer" → REGISTER_EXPENSE
+"Gasté quince lucas en el súper" → REGISTER_EXPENSE
 "ok" → CONFIRM_TRANSACTION
 "no, fueron 20 lucas" → UPDATE_TRANSACTION
 "borrá el último gasto" → DELETE_TRANSACTION
@@ -38,11 +46,11 @@ Responde ÚNICAMENTE con un objeto JSON con esta estructura exacta:
   "intent": "REGISTER_EXPENSE",
   "confidence": 0.97,
   "entities": {
-    "amount": 15000,
+    "amount": 18500,
     "category": "Combustible",
     "description": "combustible",
     "date": null,
-    "merchant": null
+    "merchant": "YPF"
   }
 }
 

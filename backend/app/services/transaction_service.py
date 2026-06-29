@@ -195,16 +195,6 @@ class TransactionService:
             category = _category_repo.find_best_match(category_name, user_id)
             if category:
                 return category.id
-                
-            # Create category automatically if not found
-            category = _category_repo.create(
-                user_id=user_id,
-                name=category_name.capitalize(),
-                type=transaction_type,
-                is_system=False
-            )
-            _category_repo.save()
-            return category.id
 
         # Fallback: always return 'Otros' so no transaction is category-less
         fallback = _category_repo.get_fallback_category(user_id)
