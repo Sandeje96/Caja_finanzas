@@ -42,6 +42,13 @@ def verify_webhook():
 
     verify_token = current_app.config.get('WHATSAPP_VERIFY_TOKEN', '')
 
+    logger.info(f"[Webhook] GET /webhook - request.args: {dict(request.args)}")
+    logger.info(f"[Webhook] hub.mode: {mode}")
+    logger.info(f"[Webhook] hub.challenge: {challenge}")
+    logger.info(f"[Webhook] hub.verify_token: {token}")
+    logger.info(f"[Webhook] WHATSAPP_VERIFY_TOKEN (config): {verify_token}")
+    logger.info(f"[Webhook] Tokens coinciden?: {token == verify_token}")
+
     if mode == 'subscribe' and token == verify_token:
         logger.info("[Webhook] ✅ Verification successful")
         return challenge, 200
